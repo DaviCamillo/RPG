@@ -1,23 +1,17 @@
-public class Sword {
-
-    // Nome da arma (ex: Katana, Adaga, Espada Longa)
-    String name;
-
-    // Dano base da arma
+public class Sword extends Item {
+    
     int damage;
-
-    // Tipo da arma (Normal, Rara, Lendaria)
     String type;
 
     // Construtor da espada
-    public Sword(String name, int damage, String type) {
-        this.name = name;
+    public Sword(String name,int valor ,int damage, String type,int size) {
+        super(name,valor,size);
         this.damage = damage;
         this.type = type;
     }
 
     // Método responsável por calcular o dano final da arma
-    public int calcularDano() {
+    public int calculateDamage() {
 
         // Gerador de número aleatório (simula dado RPG)
         java.util.Random random = new java.util.Random();

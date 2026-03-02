@@ -2,31 +2,14 @@
 // ========================
 public class Monsters {
 
-    // Nome do monstro
     String name;
-
-    // Vida atual
     int life;
-
-    // Vida máxima
     int maxLife;
-
-    // Dano base que ele causa
     int damage;
-
-    // Quantidade de moedas que ele dropa ao morrer
     int dropCoin;
-
-    // Quantidade de XP que ele entrega ao morrer
     int dropXp;
-
-    // Velocidade do monstro
     int speed;
-
-    // Resistência (reduz o dano recebido)
     int resistance;
-
-    // Construtor padrão para todos os monstros
     public Monsters(String name, int life, int damage, int dropCoin, int dropXp, int speed, int resistance) {
         this.name = name;
         this.life = life;        // Vida atual começa cheia
