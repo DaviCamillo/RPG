@@ -195,7 +195,7 @@ public class Monsters {
 
 class GoblinBoss extends Monsters {
     public GoblinBoss() {
-        super("GoblinBoss", 30, 8, 10, 5, 50, 2);
+        super("GoblinBoss", 25, 7, 15, 20, 10, 3);
         this.imagePath = "/images/sprite_goblin.png"; // <-- DEFINE A IMAGEM AQUI
         this.battleImagePath = "/images/goblin.png";
     }
@@ -203,7 +203,7 @@ class GoblinBoss extends Monsters {
 
 class GoblinExp extends Monsters {
     public GoblinExp() {
-        super("GoblinExp", 15, 4, 5, 3, 30, 1);
+        super("GoblinExp", 13, 99, 5, 4, 20, 1);
         this.imagePath = "/images/sprite_goblin.png"; // <-- DEFINE A IMAGEM AQUI
         this.battleImagePath = "/images/goblin.png";
     }
@@ -212,7 +212,7 @@ class GoblinExp extends Monsters {
 // Crie a classe do Goblin normal se não tiver:
 class Goblin extends Monsters {
     public Goblin() {
-        super("Goblin", 80, 2, 2, 1, 20, 0); // Exemplo de status
+        super("Goblin", 8, 2, 3, 2, 20, 0); // Exemplo de status
         this.imagePath = "/images/sprite_goblin.png";
         this.battleImagePath = "/images/goblin.png";
     }
