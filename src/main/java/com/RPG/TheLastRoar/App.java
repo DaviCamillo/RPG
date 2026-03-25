@@ -46,9 +46,9 @@ public class App extends javafx.application.Application {
     private long   lastFrameTime  = 0;
     private final long   frameDelay     = 200_000_000L;
     private final double speed         = 4;
-    private final int    spriteWidth   = 256;
-    private final int    spriteHeight  = 256;
-
+    private final int    spriteWidth   = 128;
+    private final int    spriteHeight  = 128;
+    private final double personagemTamanhoTela = 80;
     // ---- Animação dos inimigos ----
     private int  enemyFrame         = 0;
     private long lastEnemyFrameTime = 0;
@@ -130,11 +130,16 @@ public class App extends javafx.application.Application {
             );
 
             playerView = new ImageView(player.getSprite());
+            // O corte (Viewport) usa o tamanho real da imagem (256)
             playerView.setViewport(new Rectangle2D(0, 0, spriteWidth, spriteHeight));
-            playerView.setFitWidth(64);
-            playerView.setFitHeight(64);
-            playerView.setX((screenW / 2) - (spriteWidth / 2));
-            playerView.setY(screenH - spriteHeight - 20);
+            
+            // O tamanho visual (Fit) usa o tamanho que você quer na tela
+            playerView.setFitWidth(personagemTamanhoTela);
+            playerView.setFitHeight(personagemTamanhoTela);
+            
+            // Ajuste da posição central para considerar o novo tamanho
+            playerView.setX((screenW / 2) - (personagemTamanhoTela / 2));
+            playerView.setY(screenH - personagemTamanhoTela - 20);
             gameRoot.getChildren().add(playerView);
 
             // Inimigos
