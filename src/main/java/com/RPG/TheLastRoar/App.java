@@ -23,75 +23,76 @@ import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
-import java.util.List;
-
 /**
- * App.java — Classe principal do jogo "The Last Roar".
- *
- * ALTERACOES NESTA VERSAO:
- *
- * 1. NPC VENDEDOR (ShopNPC):
- *    - ShopNPC.criarSprite() adicionado ao gameRoot, visivel so no mapa 0
- *    - verificarColisaoNPC() roda a cada frame do playerMovement
- *    - Ao colidir, para os timers e chama ShopNPC.abrirLoja()
- *    - Ao fechar, retoma os timers normalmente
- *
- * 2. TECLA H — USAR POCAO NO MAPA:
- *    - Pressionar H usa a primeira Potion do inventario
- *    - Exibe toast flutuante "+XX HP" por 1.5s
- *    - Nao funciona com HP cheio
- *
- * 3. hudManager passado para Battle.startBattle():
- *    - Battle precisa do HudManager para atualizar moedas e HP apos batalha
- *    - Assinatura de startBattle() mudou: novo parametro HudManager ao final
+ * ============================================================
+ * App.java — Controlador principal do jogo "The Last Roar"
+ * ============================================================
  */
 public class App extends javafx.application.Application {
 
+    // ── Dimensões da tela ──────────────────────────────────────────────────
     private double screenW;
     private double screenH;
 
+    // ── Nós visuais principais ─────────────────────────────────────────────
     private Pane      gameRoot;
     private ImageView playerView;
     private ImageView mapView;
     private StackPane mainLayout;
     private Scene     cenaMestra;
+    private Button    btnInventario; // NOVO: Botão de Inventário na UI
 
+    // ── Entidade do jogador ────────────────────────────────────────────────
     private Character player;
 
+    // ── Timers de animação ─────────────────────────────────────────────────
     public AnimationTimer playerMovement;
     public AnimationTimer enemyAI;
 
-    private int    direction     = 0;
+    // ── Estado de animação do sprite do jogador ────────────────────────────
+    private int    direction     = 0;   // 0=baixo, 1=esquerda, 2=direita, 3=cima
     private int    frame         = 0;
     private long   lastFrameTime = 0;
-    private final long   frameDelay             = 200_000_000L;
-    private final double speed                 = 4;
-    private final int    spriteWidth           = 128;
-    private final int    spriteHeight          = 128;
-    private final double personagemTamanhoTela = 80;
 
+    // ── Constantes de sprite e movimento ──────────────────────────────────
+    private static final long   FRAME_DELAY        = 200_000_000L; // 200ms em nanosegundos
+    private static final double SPEED              = 4;
+    private static final int    SPRITE_W           = 128;
+    private static final int    SPRITE_H           = 128;
+    private static final double PLAYER_DISPLAY_SIZE = 80;
+
+    // ── Animação dos inimigos ──────────────────────────────────────────────
     private int  enemyFrame         = 0;
     private long lastEnemyFrameTime = 0;
 
+    // ── Flags de direção (atualizadas pelo teclado) ────────────────────────
     private static boolean up, down, left, right;
 
-    private boolean isPaused        = false;
-    private boolean lojaAberta      = false;
-    private boolean inventarioAberto = false; // Impede abrir inventario duas vezes
+    // ── Flags de estado da tela ───────────────────────────────────────────
+    private boolean isPaused         = false;
+    private boolean lojaAberta       = false;
+    private boolean inventarioAberto = false;
 
-    private final String[] LISTA_MAPAS = {"mapa_padrao.png", "mapa_padrao2.png", "mapa_padrao3.png"};
-    private int indiceMapa = 0;
+    // ── Sistema de mapas ──────────────────────────────────────────────────
+    private final String[] LISTA_MAPAS = {
+        "mapa_padrao.png", "mapa_padrao2.png", "mapa_padrao3.png"
+    };
+    private int  indiceMapa = 0;
     private boolean[][] inimigosDerrotados;
 
+    // ── Gerenciadores de subsistemas ───────────────────────────────────────
     private HudManager   hudManager;
     private PauseMenu    pauseMenu;
     private EnemyManager enemyManager;
 
-    // Sprite do NPC no mapa
+    // ── NPC vendedor ───────────────────────────────────────────────────────
     private ImageView npcView;
 
+    // ── Índice do monstro em batalha ──────────────────────────────────────
     private int monstroEmBatalhaIndex = -1;
 
+    // =========================================================================
+    // UTILIDADE ESTÁTICA
     // =========================================================================
 
     public static void resetMovement() {
@@ -99,7 +100,7 @@ public class App extends javafx.application.Application {
     }
 
     // =========================================================================
-    // CICLO DE VIDA
+    // CICLO DE VIDA — JavaFX
     // =========================================================================
 
     @Override
@@ -109,11 +110,12 @@ public class App extends javafx.application.Application {
             () -> iniciarJogo(stage, StartScreen.getUltimoSave()),
             (slotName) -> iniciarJogo(stage, slotName)
         );
+
         try {
             Image icon = new Image(getClass().getResourceAsStream("/images/logo.png"));
             stage.getIcons().add(icon);
         } catch (Exception e) {
-            System.out.println("Nao foi possivel carregar o icone: " + e.getMessage());
+            System.out.println("[App] Ícone não encontrado: " + e.getMessage());
         }
 
         cenaMestra = new Scene(menuLayout, 800, 600);
@@ -126,7 +128,7 @@ public class App extends javafx.application.Application {
     }
 
     // =========================================================================
-    // INICIALIZACAO DO JOGO
+    // INICIALIZAÇÃO DO JOGO
     // =========================================================================
 
     private void iniciarJogo(Stage stage, String saveFile) {
@@ -135,8 +137,7 @@ public class App extends javafx.application.Application {
             screenW = screenBounds.getWidth();
             screenH = screenBounds.getHeight();
 
-            mapView = new ImageView(
-                new Image(getClass().getResource("/images/mapa_padrao.png").toExternalForm()));
+            mapView = new ImageView(new Image(getClass().getResource("/images/mapa_padrao.png").toExternalForm()));
 
             gameRoot = new Pane();
             gameRoot.setPrefSize(screenW, screenH);
@@ -146,19 +147,16 @@ public class App extends javafx.application.Application {
                 new Image(getClass().getResource("/images/sprite_personagem.png").toExternalForm()),
                 new Image(getClass().getResource("/images/personagem_battle.png").toExternalForm())
             );
-
-            // Espada inicial vai pro inventario para aparecer na tela de inventario
             player.getInventory().addItem(player.getSword());
 
             playerView = new ImageView(player.getSprite());
-            playerView.setViewport(new Rectangle2D(0, 0, spriteWidth, spriteHeight));
-            playerView.setFitWidth(personagemTamanhoTela);
-            playerView.setFitHeight(personagemTamanhoTela);
-            playerView.setX((screenW / 2) - (personagemTamanhoTela / 2));
-            playerView.setY(screenH - personagemTamanhoTela - 20);
+            playerView.setViewport(new Rectangle2D(0, 0, SPRITE_W, SPRITE_H));
+            playerView.setFitWidth(PLAYER_DISPLAY_SIZE);
+            playerView.setFitHeight(PLAYER_DISPLAY_SIZE);
+            playerView.setX((screenW / 2) - (PLAYER_DISPLAY_SIZE / 2));
+            playerView.setY(screenH - PLAYER_DISPLAY_SIZE - 20);
             gameRoot.getChildren().add(playerView);
 
-            // ── NPC VENDEDOR ─── sempre criado, visibilidade controlada depois ──
             npcView = ShopNPC.criarSprite();
             gameRoot.getChildren().add(npcView);
 
@@ -175,10 +173,7 @@ public class App extends javafx.application.Application {
                 hudManager.atualizar(player);
             }
 
-            // Visibilidade inicial do NPC (so aparece no mapa 0)
             atualizarVisibilidadeNPC();
-
-            System.out.println("ALERTA: O jogo esta recriando os monstros agora!");
 
             pauseMenu = new PauseMenu(
                 this::togglePause,
@@ -191,36 +186,22 @@ public class App extends javafx.application.Application {
                 () -> { togglePause(); showMainMenu(); }
             );
 
+            // Cria o botão de inventário visual
+            criarBotaoInventario();
+
+            // Adiciona o botão de inventário no layout principal
             mainLayout = new StackPane(
-                mapView, gameRoot,
+                mapView,
+                gameRoot,
                 hudManager.getLayout(),
+                btnInventario,  // <--- Botão adicionado à tela
                 pauseMenu.getLayout()
             );
             mainLayout.setStyle("-fx-background-color: black;");
             mapView.fitWidthProperty().bind(stage.widthProperty());
             mapView.fitHeightProperty().bind(stage.heightProperty());
 
-            // ── CONTROLES DE TECLADO ──────────────────────────────────────────
-            cenaMestra.setOnKeyPressed(e -> {
-                if (e.getCode() == KeyCode.ESCAPE) togglePause();
-
-                if (!isPaused && !lojaAberta) {
-                    if (e.getCode() == KeyCode.W || e.getCode() == KeyCode.UP)    up    = true;
-                    if (e.getCode() == KeyCode.S || e.getCode() == KeyCode.DOWN)  down  = true;
-                    if (e.getCode() == KeyCode.A || e.getCode() == KeyCode.LEFT)  left  = true;
-                    if (e.getCode() == KeyCode.D || e.getCode() == KeyCode.RIGHT) right = true;
-
-                    // Tecla H: usa a primeira pocao do inventario
-                    if (e.getCode() == KeyCode.H) usarPocaoNoMapa();
-                }
-            });
-            cenaMestra.setOnKeyReleased(e -> {
-                if (e.getCode() == KeyCode.W || e.getCode() == KeyCode.UP)    up    = false;
-                if (e.getCode() == KeyCode.S || e.getCode() == KeyCode.DOWN)  down  = false;
-                if (e.getCode() == KeyCode.A || e.getCode() == KeyCode.LEFT)  left  = false;
-                if (e.getCode() == KeyCode.D || e.getCode() == KeyCode.RIGHT) right = false;
-            });
-
+            configurarControlesDeTeclado();
             cenaMestra.setRoot(mainLayout);
             iniciarTimers(stage, cenaMestra);
 
@@ -232,30 +213,103 @@ public class App extends javafx.application.Application {
             ft.play();
 
         } catch (Exception e) {
-            System.err.println("Erro ao iniciar o jogo:");
+            System.err.println("[App] Erro crítico ao iniciar o jogo:");
             e.printStackTrace();
         }
     }
 
     // =========================================================================
-    // USAR POCAO NO MAPA (tecla H)
+    // CRIAÇÃO DO BOTÃO DE INVENTÁRIO (Canto Inferior Direito)
     // =========================================================================
 
-    /**
-     * Usa a primeira pocao do inventario.
-     * Exibe um toast "+XX HP" na tela. Nao funciona com HP cheio.
-     */
-    private void usarPocaoNoMapa() {
-        if (player.getLife() >= player.getMaxLife()) return; // HP ja cheio
+    private void criarBotaoInventario() {
+        btnInventario = new Button("🎒 Inventário (I)");
+        btnInventario.setFont(Font.font("Segoe UI", FontWeight.BOLD, 16));
+        
+        // Estilo base do botão (fundo escuro, borda dourada igual HUD)
+        String estNormal = 
+            "-fx-background-color: rgba(20, 20, 20, 0.7);" +
+            "-fx-text-fill: #E8DFC0;" +
+            "-fx-border-color: #B8960C;" +
+            "-fx-border-width: 2;" +
+            "-fx-border-radius: 8;" +
+            "-fx-background-radius: 8;" +
+            "-fx-padding: 10 20;" +
+            "-fx-cursor: hand;";
+            
+        String estHover = 
+            "-fx-background-color: rgba(60, 50, 20, 0.9);" +
+            "-fx-text-fill: #FFFFFF;" +
+            "-fx-border-color: #FFD700;" +
+            "-fx-border-width: 2;" +
+            "-fx-border-radius: 8;" +
+            "-fx-background-radius: 8;" +
+            "-fx-padding: 10 20;" +
+            "-fx-cursor: hand;";
 
-        // Procura a primeira pocao
+        btnInventario.setStyle(estNormal);
+        
+        // Efeitos de Hover
+        btnInventario.setOnMouseEntered(e -> btnInventario.setStyle(estHover));
+        btnInventario.setOnMouseExited(e -> btnInventario.setStyle(estNormal));
+
+        // Ação de Clique
+        btnInventario.setOnAction(e -> {
+            // Retorna o foco para o jogo após clicar
+            Platform.runLater(() -> mainLayout.requestFocus());
+            abrirInventario();
+        });
+
+        // Alinha no canto inferior direito com margem
+        StackPane.setAlignment(btnInventario, Pos.BOTTOM_RIGHT);
+        StackPane.setMargin(btnInventario, new Insets(0, 30, 30, 0)); // Direita: 30, Baixo: 30
+    }
+
+    // =========================================================================
+    // CONTROLES DE TECLADO
+    // =========================================================================
+
+    private void configurarControlesDeTeclado() {
+        cenaMestra.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ESCAPE) togglePause();
+
+            if (!isPaused && !lojaAberta && !inventarioAberto) {
+                switch (e.getCode()) {
+                    case W, UP    -> up    = true;
+                    case S, DOWN  -> down  = true;
+                    case A, LEFT  -> left  = true;
+                    case D, RIGHT -> right = true;
+                    case H        -> usarPocaoNoMapa();
+                    case I        -> abrirInventario(); // O Atalho I continua funcionando
+                    default       -> {}
+                }
+            }
+        });
+
+        cenaMestra.setOnKeyReleased(e -> {
+            switch (e.getCode()) {
+                case W, UP    -> up    = false;
+                case S, DOWN  -> down  = false;
+                case A, LEFT  -> left  = false;
+                case D, RIGHT -> right = false;
+                default       -> {}
+            }
+        });
+    }
+
+    // =========================================================================
+    // USAR POÇÃO NO MAPA (tecla H)
+    // =========================================================================
+
+    private void usarPocaoNoMapa() {
+        if (player.getLife() >= player.getMaxLife()) return;
+
         Potion pocaoUsada = null;
         for (Item item : player.getInventory().getItems()) {
             if (item instanceof Potion p) { pocaoUsada = p; break; }
         }
-        if (pocaoUsada == null) return; // Sem pocoes
+        if (pocaoUsada == null) return; 
 
-        // Calcula a cura real (nao passa do maximo)
         int curaReal = Math.min(pocaoUsada.getHealedLife(), player.getMaxLife() - player.getLife());
         player.heal(pocaoUsada.getHealedLife());
         player.getInventory().removeItem(pocaoUsada);
@@ -264,9 +318,37 @@ public class App extends javafx.application.Application {
         exibirToast("+" + curaReal + " HP", Color.web("#00CC66"));
     }
 
+    // =========================================================================
+    // ABRIR INVENTÁRIO (Botão UI ou tecla I)
+    // =========================================================================
+
     /**
-     * Exibe um label flutuante temporario (toast) no centro da tela.
+     * Abre a tela de inventário como overlay.
      */
+    private void abrirInventario() {
+        // SEGURANÇA: Não abre se já estiver aberto, pausado ou na loja
+        if (inventarioAberto || isPaused || lojaAberta) return;
+        
+        inventarioAberto = true;
+        btnInventario.setVisible(false); // Esconde o botão enquanto o inventário está aberto
+        
+        playerMovement.stop();
+        enemyAI.stop();
+        resetMovement();
+
+        InventoryScreen.open(mainLayout, player, () -> {
+            inventarioAberto = false;
+            btnInventario.setVisible(true); // Mostra o botão novamente
+            playerMovement.start();
+            if (!enemyManager.isEmpty()) enemyAI.start();
+            Platform.runLater(() -> mainLayout.requestFocus());
+        });
+    }
+
+    // =========================================================================
+    // TOAST FLUTUANTE
+    // =========================================================================
+
     private void exibirToast(String mensagem, Color cor) {
         Label toast = new Label(mensagem);
         toast.setFont(Font.font("Segoe UI", FontWeight.BOLD, 36));
@@ -277,7 +359,6 @@ public class App extends javafx.application.Application {
             "-fx-background-radius: 12;"
         );
         toast.setMouseTransparent(true);
-
         StackPane.setAlignment(toast, Pos.CENTER);
         mainLayout.getChildren().add(toast);
         toast.setOpacity(0);
@@ -298,17 +379,13 @@ public class App extends javafx.application.Application {
     }
 
     // =========================================================================
-    // NPC
+    // NPC VENDEDOR
     // =========================================================================
 
-    /** Mostra o NPC somente no mapa 0. */
     private void atualizarVisibilidadeNPC() {
         if (npcView != null) npcView.setVisible(indiceMapa == 0);
     }
 
-    /**
-     * Verifica colisao com o NPC a cada frame e abre a loja se necessario.
-     */
     private void verificarColisaoNPC() {
         if (indiceMapa != 0 || lojaAberta || npcView == null) return;
 
@@ -317,9 +394,11 @@ public class App extends javafx.application.Application {
             enemyAI.stop();
             resetMovement();
             lojaAberta = true;
+            btnInventario.setVisible(false); // Esconde botão de inventário na loja
 
             ShopNPC.abrirLoja(mainLayout, player, hudManager, () -> {
-                lojaAberta = false;
+                lojaAberta = false; 
+                btnInventario.setVisible(true); // Retorna botão
                 lastFrameTime = System.nanoTime();
                 playerMovement.start();
                 if (!enemyManager.isEmpty()) enemyAI.start();
@@ -336,9 +415,12 @@ public class App extends javafx.application.Application {
         if (playerMovement != null) playerMovement.stop();
         if (enemyAI        != null) enemyAI.stop();
 
-        isPaused   = false;
-        lojaAberta = false;
+        isPaused         = false;
+        lojaAberta       = false;
+        inventarioAberto = false;
         resetMovement();
+
+        Battle.resetInBattle();
 
         Stage stage = (Stage) cenaMestra.getWindow();
         StackPane menuLayout = StartScreen.createLayout(
@@ -355,13 +437,14 @@ public class App extends javafx.application.Application {
     // =========================================================================
 
     private void togglePause() {
-        if (lojaAberta) return;
+        if (lojaAberta || inventarioAberto) return;
         isPaused = !isPaused;
 
         if (isPaused) {
             playerMovement.stop();
             enemyAI.stop();
             resetMovement();
+            btnInventario.setVisible(false); // Esconde botão na pausa
             pauseMenu.atualizarBotoesLoad(
                 SaveManager.existe("save1.json"),
                 SaveManager.existe("save2.json"),
@@ -370,6 +453,7 @@ public class App extends javafx.application.Application {
             pauseMenu.setVisible(true);
         } else {
             pauseMenu.setVisible(false);
+            btnInventario.setVisible(true); // Retorna botão
             playerMovement.start();
             if (!enemyManager.isEmpty()) enemyAI.start();
         }
@@ -390,10 +474,13 @@ public class App extends javafx.application.Application {
         if (data == null) return;
 
         indiceMapa = data.mapa;
+
         for (int i = 0; i < data.inimigosDerrotados.length; i++) {
             System.arraycopy(data.inimigosDerrotados[i], 0,
-                             inimigosDerrotados[i], 0, data.inimigosDerrotados[i].length);
+                             inimigosDerrotados[i], 0,
+                             data.inimigosDerrotados[i].length);
         }
+
         mapView.setImage(new Image(
             getClass().getResource("/images/" + LISTA_MAPAS[indiceMapa]).toExternalForm()));
         enemyManager.configurarParaMapa(indiceMapa);
@@ -410,47 +497,56 @@ public class App extends javafx.application.Application {
     }
 
     // =========================================================================
-    // TROCA DE CENARIO
+    // TROCA DE CENÁRIO (mapa)
     // =========================================================================
 
     private void trocarCenario(boolean avancar) {
         playerMovement.stop();
         enemyAI.stop();
 
-        FadeTransition ft = new FadeTransition(Duration.millis(300), mainLayout);
-        ft.setFromValue(1.0); ft.setToValue(0.0);
-        ft.setOnFinished(e -> {
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(300), mainLayout);
+        fadeOut.setFromValue(1.0);
+        fadeOut.setToValue(0.0);
+        fadeOut.setOnFinished(e -> {
+            boolean trocou = false;
+
             if (avancar && indiceMapa < LISTA_MAPAS.length - 1) {
                 indiceMapa++;
-                playerView.setY(screenH - spriteHeight - 20);
-                playerView.setX((screenW / 2) - (spriteWidth / 2));
+                playerView.setY(20);
+                playerView.setX((screenW / 2) - (SPRITE_W / 2));
+                trocou = true;
             } else if (!avancar && indiceMapa > 0) {
                 indiceMapa--;
-                playerView.setY(20);
-                playerView.setX((screenW / 2) - (spriteWidth / 2));
-            } else {
+                playerView.setY(screenH - SPRITE_H - 20);
+                playerView.setX((screenW / 2) - (SPRITE_W / 2));
+                trocou = true;
+            }
+
+            if (!trocou) {
                 playerMovement.start();
                 if (!enemyManager.isEmpty()) enemyAI.start();
                 return;
             }
+
             mapView.setImage(new Image(
                 getClass().getResource("/images/" + LISTA_MAPAS[indiceMapa]).toExternalForm()));
             enemyManager.configurarParaMapa(indiceMapa);
-            atualizarVisibilidadeNPC(); // Atualiza visibilidade do NPC ao trocar de mapa
+            atualizarVisibilidadeNPC();
 
             FadeTransition fadeIn = new FadeTransition(Duration.millis(300), mainLayout);
-            fadeIn.setFromValue(0.0); fadeIn.setToValue(1.0);
+            fadeIn.setFromValue(0.0);
+            fadeIn.setToValue(1.0);
             fadeIn.setOnFinished(ev -> {
                 playerMovement.start();
                 if (!enemyManager.isEmpty()) enemyAI.start();
             });
             fadeIn.play();
         });
-        ft.play();
+        fadeOut.play();
     }
 
     // =========================================================================
-    // POS-BATALHA
+    // PÓS-BATALHA
     // =========================================================================
 
     public void resumeTimers() {
@@ -458,47 +554,58 @@ public class App extends javafx.application.Application {
             enemyManager.removerInimigo(monstroEmBatalhaIndex);
             monstroEmBatalhaIndex = -1;
         }
+
         resetMovement();
         lastFrameTime = System.nanoTime();
         mainLayout.setOpacity(1.0);
+
         Platform.runLater(() -> {
             mainLayout.requestFocus();
-            System.out.println("Teclado reativado.");
+            playerMovement.start();
+            if (!enemyManager.isEmpty()) enemyAI.start();
         });
-        playerMovement.start();
-        if (!enemyManager.isEmpty()) enemyAI.start();
     }
 
     // =========================================================================
-    // TIMERS
+    // TIMERS (LOOP PRINCIPAL DO JOGO)
     // =========================================================================
 
     private void iniciarTimers(Stage stage, Scene scene) {
+
         playerMovement = new AnimationTimer() {
             @Override
             public void handle(long now) {
                 if (up) {
                     if (playerView.getY() <= 5) {
-                        if (indiceMapa < LISTA_MAPAS.length - 1) trocarCenario(true);
-                        else playerView.setY(5);
-                    } else { playerView.setY(playerView.getY() - speed); }
-                    setDirection(playerView, 3); animate(playerView);
+                        trocarCenario(true);
+                    } else {
+                        playerView.setY(playerView.getY() - SPEED);
+                    }
+                    setDirection(playerView, 3);
+                    animate(playerView, now);
+
                 } else if (down) {
-                    if (playerView.getY() >= screenH - spriteHeight - 5) {
-                        if (indiceMapa > 0) trocarCenario(false);
-                        else playerView.setY(screenH - spriteHeight - 5);
-                    } else { playerView.setY(playerView.getY() + speed); }
-                    setDirection(playerView, 0); animate(playerView);
+                    if (playerView.getY() >= screenH - SPRITE_H - 5) {
+                        trocarCenario(false);
+                    } else {
+                        playerView.setY(playerView.getY() + SPEED);
+                    }
+                    setDirection(playerView, 0);
+                    animate(playerView, now);
+
                 } else if (left) {
-                    if (playerView.getX() > 5) playerView.setX(playerView.getX() - speed);
-                    setDirection(playerView, 1); animate(playerView);
+                    if (playerView.getX() > 5)
+                        playerView.setX(playerView.getX() - SPEED);
+                    setDirection(playerView, 1);
+                    animate(playerView, now);
+
                 } else if (right) {
-                    if (playerView.getX() < screenW - spriteWidth - 5)
-                        playerView.setX(playerView.getX() + speed);
-                    setDirection(playerView, 2); animate(playerView);
+                    if (playerView.getX() < screenW - SPRITE_W - 5)
+                        playerView.setX(playerView.getX() + SPEED);
+                    setDirection(playerView, 2);
+                    animate(playerView, now);
                 }
 
-                // Checa colisao com NPC a cada frame do movimento
                 verificarColisaoNPC();
             }
         };
@@ -507,29 +614,38 @@ public class App extends javafx.application.Application {
         enemyAI = new AnimationTimer() {
             @Override
             public void handle(long now) {
-                if (now - lastEnemyFrameTime > frameDelay) {
+                if (now - lastEnemyFrameTime > FRAME_DELAY) {
                     enemyFrame = (enemyFrame + 1) % 4;
                     lastEnemyFrameTime = now;
                 }
-                int colisao = enemyManager.atualizar(playerView.getX(), playerView.getY(), enemyFrame);
+
+                int colisao = enemyManager.atualizar(
+                    playerView.getX(), playerView.getY(), enemyFrame);
+
                 if (colisao != -1) {
                     playerMovement.stop();
                     enemyAI.stop();
+                    
+                    // Esconde botão durante a batalha
+                    btnInventario.setVisible(false);
 
                     double dx = playerView.getX() - enemyManager.getView(colisao).getX();
                     playerView.setX(playerView.getX() + (dx > 0 ? 40 : -40));
                     monstroEmBatalhaIndex = colisao;
 
-                    Monsters monstro = enemyManager.getMonstro(colisao);
-                    ImageView ev     = enemyManager.getView(colisao);
+                    Monsters  monstro = enemyManager.getMonstro(colisao);
+                    ImageView ev      = enemyManager.getView(colisao);
 
                     FadeTransition ft = new FadeTransition(Duration.millis(500), mainLayout);
-                    ft.setFromValue(1); ft.setToValue(0);
-                    // NOVO: passa hudManager para Battle poder atualizar HUD de moedas e HP
-                    ft.setOnFinished(e ->
+                    ft.setFromValue(1);
+                    ft.setToValue(0);
+                    ft.setOnFinished(e -> {
                         Battle.startBattle(stage, cenaMestra, player, monstro,
-                                           playerView, ev, App.this, mainLayout, hudManager)
-                    );
+                                           playerView, ev, App.this, mainLayout, hudManager);
+                        // Ao final da batalha o botão precisa voltar,
+                        // Você pode garantir que btnInventario.setVisible(true) aconteça no seu resumeTimers() se necessário.
+                        btnInventario.setVisible(true);
+                    });
                     ft.play();
                 }
             }
@@ -538,15 +654,17 @@ public class App extends javafx.application.Application {
     }
 
     // =========================================================================
-    // ANIMACAO DO SPRITE
+    // ANIMAÇÃO DO SPRITE DO JOGADOR
     // =========================================================================
 
-    private void animate(ImageView view) {
-        long now = System.nanoTime();
-        if (now - lastFrameTime > frameDelay) {
+    private void animate(ImageView view, long now) {
+        if (now - lastFrameTime > FRAME_DELAY) {
             frame = (frame + 1) % 4;
             view.setViewport(new Rectangle2D(
-                frame * spriteWidth, direction * spriteHeight, spriteWidth, spriteHeight));
+                frame * SPRITE_W,
+                direction * SPRITE_H,
+                SPRITE_W, SPRITE_H
+            ));
             lastFrameTime = now;
         }
     }
@@ -555,7 +673,8 @@ public class App extends javafx.application.Application {
         if (direction != newDirection) {
             direction = newDirection;
             frame = 0;
-            view.setViewport(new Rectangle2D(0, direction * spriteHeight, spriteWidth, spriteHeight));
+            view.setViewport(new Rectangle2D(
+                0, direction * SPRITE_H, SPRITE_W, SPRITE_H));
         }
     }
 

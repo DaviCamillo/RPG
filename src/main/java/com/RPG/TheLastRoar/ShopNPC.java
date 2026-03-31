@@ -1,14 +1,18 @@
 package com.RPG.TheLastRoar;
 
 import javafx.animation.FadeTransition;
+import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -20,87 +24,62 @@ import javafx.util.Duration;
 
 /**
  * ============================================================
- * ShopNPC.java — NPC vendedor no mapa 0
+ * ShopNPC.java — NPC vendedor posicionado no mapa 0
  * ============================================================
  *
- * COMO FUNCIONA:
- * 1. O NPC é um ImageView posicionado fixo no mapa 0
- * 2. O App verifica colisão com ele no timer playerMovement
- * 3. Ao colidir, abre uma tela de loja (overlay estilo PauseMenu)
- * 4. O jogador compra itens com as moedas que tem
- * 5. Itens comprados vão direto pro inventário
+ * RESPONSABILIDADE:
+ * Representa o NPC ferreiro visível no mapa 0. Quando o jogador
+ * se aproxima, App.java detecta a colisão e chama abrirLoja().
+ * A tela da loja é um overlay sobre o jogo (igual ao PauseMenu).
+ *
+ * CORREÇÃO BUG 2 — LOJA NÃO FECHAVA:
+ * Causa original: ShopNPC tinha seu próprio flag estático 'lojaAberta'.
+ * Se App.lojaAberta e ShopNPC.lojaAberta ficassem fora de sincronia
+ * (ex: por erro de callback), a loja bloqueava permanentemente.
+ *
+ * Correção: O campo 'lojaAberta' foi COMPLETAMENTE REMOVIDO deste arquivo.
+ * App.java é o ÚNICO responsável por gerenciar o estado da loja.
+ * abrirLoja() agora é uma função pura — apenas monta a UI e chama
+ * onClose quando o jogador pressiona FECHAR. Quem seta/reseta o flag
+ * é exclusivamente App.verificarColisaoNPC().
  *
  * ITENS À VENDA:
- * - Adaga         (10 moedas) — espada rápida, 2 ataques
- * - Espada Longa  (25 moedas) — espada com crítico variável
- * - Katana Rara   (50 moedas) — crítico 3x
- * - Poção Pequena  (5 moedas) — cura 30 HP
- * - Poção Grande  (15 moedas) — cura 70 HP
- *
- * ESTRUTURA DO LAYOUT DA LOJA:
- *  ┌──────────────────────────────────────────────┐
- *  │  LOJA DO FERREIRO ───────────────────────    │
- *  │                                              │
- *  │  Ouro: 42 🪙                                 │
- *  │                                              │
- *  │  [⚔ Adaga]        Dano: 5 · 10 moedas       │
- *  │  [⚔ Espada Longa] Dano: 8 · 25 moedas       │
- *  │  [⚔ Katana Rara]  Dano:10 · 50 moedas       │
- *  │  [🧪 Poção Pequena]  +30 HP · 5 moedas      │
- *  │  [🧪 Poção Grande]   +70 HP · 15 moedas     │
- *  │                                              │
- *  │                          [FECHAR]            │
- *  └──────────────────────────────────────────────┘
+ * Armas  : Adaga (10), Espada Longa (25), Katana (50)
+ * Poções : Poção Pequena (5), Poção Grande (15)
  */
 public class ShopNPC {
 
-    // ── Posição do NPC no mapa (ajuste conforme seu mapa) ─────────────────
-    public static final double NPC_X = 200;  // pixels da esquerda
-    public static final double NPC_Y = 100;  // pixels do topo
-    public static final double NPC_SIZE = 70; // tamanho do sprite no mapa
+    // ── Posição e tamanho do NPC no mapa ──────────────────────────────────
+    public static final double NPC_X    = 200;
+    public static final double NPC_Y    = 100;
+    public static final double NPC_SIZE = 70;
 
-    // ── Raio de colisão (em pixels) para abrir a loja ─────────────────────
+    // ── Raio de proximidade para abrir a loja ──────────────────────────────
     private static final double RAIO_COLISAO = 80;
 
-    // ── Flag para não abrir a loja duas vezes ─────────────────────────────
-    private static boolean lojaAberta = false;
-
     // =========================================================================
-    // CRIAÇÃO DO SPRITE DO NPC NO MAPA
+    // CRIAÇÃO DO SPRITE DO NPC
     // =========================================================================
 
-    /**
-     * Cria e retorna o ImageView do NPC para ser adicionado ao gameRoot.
-     * Se a imagem não existir, usa um placeholder colorido.
-     */
     public static ImageView criarSprite() {
         ImageView npcView = new ImageView();
-
-        // Tenta carregar o sprite do NPC
-        // Coloque uma imagem em /images/npc_vendedor.png no seu projeto
-        // Se não tiver, o NPC aparece como um retângulo (placeholder)
         try {
             var url = ShopNPC.class.getResource("/images/npc_vendedor.png");
             if (url != null) {
                 npcView.setImage(new Image(url.toExternalForm()));
             } else {
-                System.out.println("[ShopNPC] Sprite npc_vendedor.png nao encontrado, usando placeholder.");
-                // Placeholder: um ícone de "loja" gerado em texto (sem imagem)
+                System.out.println("[ShopNPC] npc_vendedor.png não encontrado, usando placeholder.");
             }
         } catch (Exception e) {
             System.out.println("[ShopNPC] Erro ao carregar sprite: " + e.getMessage());
         }
 
-        // Posição e tamanho fixos no mapa
         npcView.setFitWidth(NPC_SIZE);
         npcView.setFitHeight(NPC_SIZE);
         npcView.setX(NPC_X);
         npcView.setY(NPC_Y);
         npcView.setPreserveRatio(true);
-
-        // Marcador de ID para identificar este nó depois
         npcView.setId("npc_vendedor");
-
         return npcView;
     }
 
@@ -108,23 +87,12 @@ public class ShopNPC {
     // VERIFICAÇÃO DE COLISÃO
     // =========================================================================
 
-    /**
-     * Verifica se o jogador está próximo o suficiente do NPC para abrir a loja.
-     *
-     * @param playerX  Posição X do jogador
-     * @param playerY  Posição Y do jogador
-     * @return true se o jogador está dentro do raio de colisão
-     */
     public static boolean verificarColisao(double playerX, double playerY) {
-        // Centro do NPC
-        double npcCentroX = NPC_X + NPC_SIZE / 2;
-        double npcCentroY = NPC_Y + NPC_SIZE / 2;
-
-        // Centro do jogador (aproximado como 32x32 dentro do sprite)
+        double npcCentroX  = NPC_X + NPC_SIZE / 2;
+        double npcCentroY  = NPC_Y + NPC_SIZE / 2;
         double playerCentroX = playerX + 40;
         double playerCentroY = playerY + 40;
 
-        // Distância euclidiana entre os dois centros
         double dx = playerCentroX - npcCentroX;
         double dy = playerCentroY - npcCentroY;
         return Math.sqrt(dx * dx + dy * dy) < RAIO_COLISAO;
@@ -134,34 +102,22 @@ public class ShopNPC {
     // ABERTURA DA LOJA
     // =========================================================================
 
-    /**
-     * Abre a tela da loja como overlay sobre o jogo.
-     *
-     * @param mainLayout  StackPane principal do jogo
-     * @param player      Personagem do jogador (para checar moedas e inventário)
-     * @param hudManager  HudManager para atualizar a HUD após a compra
-     * @param onClose     Callback chamado ao fechar a loja (retoma timers)
-     */
     public static void abrirLoja(StackPane mainLayout, Character player,
                                   HudManager hudManager, Runnable onClose) {
-        // Evita abrir duas vezes
-        if (lojaAberta) return;
-        lojaAberta = true;
+        // Monta o painel da loja
+        VBox painel = construirPainelLoja(player, hudManager, () ->
+            fechar(mainLayout, onClose)
+        );
 
-        // Constrói o painel da loja
-        VBox painel = construirPainelLoja(player, hudManager, () -> {
-            lojaAberta = false;
-            fechar(mainLayout, onClose);
-        });
-
-        // Overlay escuro semitransparente (igual ao InventoryScreen)
+        // Overlay escuro semitransparente
         StackPane overlay = new StackPane(painel);
         overlay.setStyle("-fx-background-color: rgba(0, 0, 0, 0.82);");
         overlay.setAlignment(Pos.CENTER_LEFT);
 
-        // Fade in
+        // Animação de entrada com fade
         overlay.setOpacity(0);
         mainLayout.getChildren().add(overlay);
+
         FadeTransition ft = new FadeTransition(Duration.millis(250), overlay);
         ft.setToValue(1.0);
         ft.play();
@@ -175,13 +131,12 @@ public class ShopNPC {
                                              Runnable onClose) {
         VBox painel = new VBox(0);
         painel.setAlignment(Pos.CENTER_LEFT);
-        painel.setPadding(new Insets(0, 0, 0, 120)); // Alinhamento estilo Ruined King
+        painel.setPadding(new Insets(0, 0, 0, 120));
 
-        // ── Título ────────────────────────────────────────────────────────────
+        // ── Título ────────────────────────────────────────────────────────
         Text titulo = new Text("LOJA DO FERREIRO");
         titulo.setFont(Font.font("Palatino Linotype", FontWeight.BOLD, 44));
         titulo.setFill(Color.web("#F0E6C0"));
-
         DropShadow sombra = new DropShadow();
         sombra.setColor(Color.web("#C8A000", 0.8));
         sombra.setRadius(20);
@@ -189,52 +144,47 @@ public class ShopNPC {
         VBox.setMargin(titulo, new Insets(0, 0, 6, 0));
         painel.getChildren().add(titulo);
 
-        // ── Linha decorativa ──────────────────────────────────────────────────
+        // ── Linha decorativa ──────────────────────────────────────────────
         Line sep = new Line(0, 0, 320, 0);
         sep.setStroke(Color.web("#B8960C", 0.6));
         sep.setStrokeWidth(1.0);
         VBox.setMargin(sep, new Insets(4, 0, 16, 0));
         painel.getChildren().add(sep);
 
-        // ── Ouro do jogador ───────────────────────────────────────────────────
+        // ── Ouro do jogador ───────────────────────────────────────────────
         Label lblOuro = new Label("Ouro:  " + player.getCoin() + "  \uD83E\uDE99");
         lblOuro.setFont(Font.font("Segoe UI", FontWeight.BOLD, 18));
         lblOuro.setTextFill(Color.GOLD);
         VBox.setMargin(lblOuro, new Insets(0, 0, 20, 4));
         painel.getChildren().add(lblOuro);
 
-        // ── Label da seção de armas ───────────────────────────────────────────
+        // ── Seção: Armas ──────────────────────────────────────────────────
         Text lblArmas = new Text("ARMAS");
         lblArmas.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
         lblArmas.setFill(Color.web("#888070"));
         VBox.setMargin(lblArmas, new Insets(0, 0, 8, 4));
         painel.getChildren().add(lblArmas);
 
-        // ── Itens à venda — Armas ─────────────────────────────────────────────
-        // Cada item: (objeto Item, preço em moedas, descrição extra)
-        adicionarItemLoja(painel, new Sword("Adaga", 10, 5, "Comum", 2),
+        adicionarItemLoja(painel, new Sword("Adaga",       10, 5, "Comum", 2),
                 10, "Ataca 2x por turno", player, lblOuro, hudManager);
+        adicionarItemLoja(painel, new Sword("Espada Longa", 25, 8, "Rara",  3),
+                25, "Crítico com 18+",    player, lblOuro, hudManager);
+        adicionarItemLoja(painel, new Sword("Katana",      50, 10, "Rara",  3),
+                50, "Crítico 3x",         player, lblOuro, hudManager);
 
-        adicionarItemLoja(painel, new Sword("Espada Longa", 25, 8, "Rara", 3),
-                25, "Critico com 18+", player, lblOuro, hudManager);
-
-        adicionarItemLoja(painel, new Sword("Katana", 50, 10, "Rara", 3),
-                50, "Critico 3x", player, lblOuro, hudManager);
-
-        // ── Label da seção de poções ──────────────────────────────────────────
-        Text lblPocoes = new Text("POCOES");
+        // ── Seção: Poções ──────────────────────────────────────────────────
+        Text lblPocoes = new Text("POÇÕES");
         lblPocoes.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
         lblPocoes.setFill(Color.web("#888070"));
         VBox.setMargin(lblPocoes, new Insets(14, 0, 8, 4));
         painel.getChildren().add(lblPocoes);
 
-        adicionarItemLoja(painel, new Potion("Pocao Pequena", 5, 1, 30),
-                5, "Restaura 30 HP", player, lblOuro, hudManager);
-
-        adicionarItemLoja(painel, new Potion("Pocao Grande", 15, 1, 70),
+        adicionarItemLoja(painel, new Potion("Poção Pequena", 5,  1, 30),
+                5,  "Restaura 30 HP", player, lblOuro, hudManager);
+        adicionarItemLoja(painel, new Potion("Poção Grande",  15, 1, 70),
                 15, "Restaura 70 HP", player, lblOuro, hudManager);
 
-        // ── Botão Fechar ──────────────────────────────────────────────────────
+        // ── Botão Fechar ──────────────────────────────────────────────────
         Button btnFechar = criarBotaoFechar();
         VBox.setMargin(btnFechar, new Insets(20, 0, 0, 0));
         btnFechar.setOnAction(e -> onClose.run());
@@ -247,10 +197,6 @@ public class ShopNPC {
     // LINHA DE ITEM DA LOJA
     // =========================================================================
 
-    /**
-     * Adiciona uma linha de item comprável ao painel da loja.
-     * Cada linha tem: ícone + nome + descrição + preço + botão COMPRAR.
-     */
     private static void adicionarItemLoja(VBox painel, Item item, int preco,
                                            String descricao, Character player,
                                            Label lblOuro, HudManager hudManager) {
@@ -266,29 +212,29 @@ public class ShopNPC {
         );
         VBox.setMargin(linha, new Insets(0, 0, 6, 0));
 
-        // Ícone do tipo de item
-        Label icone = new Label(item instanceof Sword ? "\u2694" : "\uD83E\uDDEA");
+        // Ícone do tipo
+        Label icone = new Label(item instanceof Sword ? "⚔" : "🧪");
         icone.setFont(Font.font("Segoe UI Emoji", 20));
 
-        // Nome e descrição
+        // Nome e atributo
         VBox infoBox = new VBox(2);
         Label nome = new Label(item.getName());
         nome.setFont(Font.font("Segoe UI", FontWeight.BOLD, 15));
         nome.setTextFill(Color.web("#E8DFC0"));
 
-        // Atributo principal
-        String atributo = "";
-        if (item instanceof Sword s) atributo = "Dano: " + s.getDamage() + "  |  " + descricao;
+        String atributo;
+        if      (item instanceof Sword s)  atributo = "Dano: " + s.getDamage() + "  |  " + descricao;
         else if (item instanceof Potion p) atributo = "+" + p.getHealedLife() + " HP  |  " + descricao;
+        else                               atributo = descricao;
 
         Label desc = new Label(atributo);
         desc.setFont(Font.font("Segoe UI", 12));
         desc.setTextFill(Color.web("#888070"));
         infoBox.getChildren().addAll(nome, desc);
 
-        // Espaçador
-        javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
-        HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
+        // Espaçador flexível
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // Preço
         Label lblPreco = new Label(preco + " \uD83E\uDE99");
@@ -296,11 +242,8 @@ public class ShopNPC {
         lblPreco.setTextFill(Color.GOLD);
         lblPreco.setMinWidth(70);
 
-        // Botão COMPRAR
-        Button btnComprar = new Button("COMPRAR");
-        btnComprar.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
-
-        String estNormal =
+        // Estilos do botão COMPRAR
+        final String estNormal =
             "-fx-background-color: rgba(0,180,180,0.15);" +
             "-fx-border-color: #00E5E5;" +
             "-fx-border-width: 1;" +
@@ -309,7 +252,7 @@ public class ShopNPC {
             "-fx-text-fill: #00E5E5;" +
             "-fx-padding: 6 14;" +
             "-fx-cursor: hand;";
-        String estHover =
+        final String estHover =
             "-fx-background-color: rgba(0,200,200,0.30);" +
             "-fx-border-color: #00E5E5;" +
             "-fx-border-width: 1;" +
@@ -318,7 +261,7 @@ public class ShopNPC {
             "-fx-text-fill: white;" +
             "-fx-padding: 6 14;" +
             "-fx-cursor: hand;";
-        String estDisable =
+        final String estDisable =
             "-fx-background-color: rgba(20,20,20,0.4);" +
             "-fx-border-color: #443E30;" +
             "-fx-border-width: 1;" +
@@ -327,49 +270,51 @@ public class ShopNPC {
             "-fx-text-fill: #443E30;" +
             "-fx-padding: 6 14;";
 
+        Button btnComprar = new Button("COMPRAR");
+        btnComprar.setFont(Font.font("Segoe UI", FontWeight.BOLD, 13));
         btnComprar.setStyle(estNormal);
         btnComprar.setOnMouseEntered(e -> { if (!btnComprar.isDisabled()) btnComprar.setStyle(estHover); });
         btnComprar.setOnMouseExited(e ->  { if (!btnComprar.isDisabled()) btnComprar.setStyle(estNormal); });
 
-        // Desabilita o botão se o jogador não tem moedas suficientes
+        // Desabilita se o jogador não tiver moedas suficientes ao abrir
         if (player.getCoin() < preco) {
             btnComprar.setDisable(true);
             btnComprar.setStyle(estDisable);
         }
 
-        // ── Lógica de compra ──────────────────────────────────────────────────
+        // ── Lógica de compra ──────────────────────────────────────────────
         btnComprar.setOnAction(e -> {
-            // Verifica novamente se tem moedas (pode ter mudado)
+            // Verifica se tem ouro
             if (player.getCoin() < preco) {
-                nome.setTextFill(Color.web("#FF6666")); // Flash de erro: nome fica vermelho
-                javafx.animation.PauseTransition flash =
-                    new javafx.animation.PauseTransition(Duration.millis(600));
-                flash.setOnFinished(ev -> nome.setTextFill(Color.web("#E8DFC0")));
-                flash.play();
+                nome.setTextFill(Color.web("#FF6666")); // Flash vermelho
+                PauseTransition ptSemOuro = new PauseTransition(Duration.millis(600));
+                ptSemOuro.setOnFinished(ev -> nome.setTextFill(Color.web("#E8DFC0")));
+                ptSemOuro.play();
                 return;
             }
 
-            // Tenta adicionar ao inventário (pode estar cheio)
+            // Verifica inventário cheio
             boolean adicionado = player.getInventory().addItem(item);
             if (!adicionado) {
-                nome.setTextFill(Color.web("#FF9944")); // Flash laranja: inventário cheio
-                javafx.animation.PauseTransition flash =
-                    new javafx.animation.PauseTransition(Duration.millis(600));
-                flash.setOnFinished(ev -> nome.setTextFill(Color.web("#E8DFC0")));
-                flash.play();
-                desc.setText("Inventario cheio!");
+                nome.setTextFill(Color.web("#FF9944")); // Flash laranja
+                desc.setText("Inventário cheio!");
+                PauseTransition ptInvCheio = new PauseTransition(Duration.millis(600));
+                ptInvCheio.setOnFinished(ev -> {
+                    nome.setTextFill(Color.web("#E8DFC0"));
+                    desc.setText(atributo);
+                });
+                ptInvCheio.play();
                 return;
             }
 
-            // Desconta as moedas
+            // Desconta as moedas e atualiza a interface
             player.removeCoin(preco);
-
-            // Atualiza o display de ouro na loja e na HUD
             lblOuro.setText("Ouro:  " + player.getCoin() + "  \uD83E\uDE99");
             if (hudManager != null) hudManager.atualizar(player);
 
-            // Feedback visual: botão vira "COMPRADO!" brevemente
+            // Feedback visual no botão: "COMPRADO!"
             btnComprar.setText("COMPRADO!");
+            btnComprar.setDisable(true); // Evita spam de duplo clique enquanto a animação roda
             btnComprar.setStyle(
                 "-fx-background-color: rgba(0,180,80,0.25);" +
                 "-fx-border-color: #00CC66;" +
@@ -380,19 +325,19 @@ public class ShopNPC {
                 "-fx-padding: 6 14;"
             );
 
-            // Após 1.5s, volta ao normal (ou desabilita se não tem mais moedas)
-            javafx.animation.PauseTransition reset =
-                new javafx.animation.PauseTransition(Duration.millis(1500));
-            reset.setOnFinished(ev -> {
+            // Restaura o botão após 1.5s
+            PauseTransition ptComprado = new PauseTransition(Duration.millis(1500));
+            ptComprado.setOnFinished(ev -> {
                 btnComprar.setText("COMPRAR");
                 if (player.getCoin() < preco) {
                     btnComprar.setDisable(true);
                     btnComprar.setStyle(estDisable);
                 } else {
+                    btnComprar.setDisable(false);
                     btnComprar.setStyle(estNormal);
                 }
             });
-            reset.play();
+            ptComprado.play();
         });
 
         linha.getChildren().addAll(icone, infoBox, spacer, lblPreco, btnComprar);
@@ -410,14 +355,14 @@ public class ShopNPC {
         btn.setPrefHeight(48);
         btn.setAlignment(Pos.CENTER_LEFT);
 
-        String estNormal =
+        final String estNormal =
             "-fx-background-color: transparent;" +
             "-fx-text-fill: #D8D0C0;" +
             "-fx-padding: 0 0 0 20;" +
             "-fx-cursor: hand;" +
             "-fx-border-color: transparent;" +
             "-fx-font-size: 20px;";
-        String estHover =
+        final String estHover =
             "-fx-background-color: rgba(0,210,210,0.15);" +
             "-fx-text-fill: white;" +
             "-fx-padding: 0 0 0 20;" +
@@ -427,7 +372,7 @@ public class ShopNPC {
             "-fx-font-size: 20px;";
 
         btn.setStyle(estNormal);
-        btn.setOnMouseEntered(e -> { btn.setStyle(estHover); btn.setText("\u203a  FECHAR"); });
+        btn.setOnMouseEntered(e -> { btn.setStyle(estHover);  btn.setText("›  FECHAR"); });
         btn.setOnMouseExited(e ->  { btn.setStyle(estNormal); btn.setText("   FECHAR"); });
         return btn;
     }
@@ -437,18 +382,19 @@ public class ShopNPC {
     // =========================================================================
 
     private static void fechar(StackPane mainLayout, Runnable onClose) {
-        if (!mainLayout.getChildren().isEmpty()) {
-            javafx.scene.Node overlay =
-                mainLayout.getChildren().get(mainLayout.getChildren().size() - 1);
-            FadeTransition ft = new FadeTransition(Duration.millis(200), overlay);
-            ft.setToValue(0.0);
-            ft.setOnFinished(e -> {
-                mainLayout.getChildren().remove(overlay);
-                onClose.run();
-            });
-            ft.play();
-        } else {
+        if (mainLayout.getChildren().isEmpty()) {
             onClose.run();
+            return;
         }
+
+        Node overlay = mainLayout.getChildren().get(mainLayout.getChildren().size() - 1);
+
+        FadeTransition ft = new FadeTransition(Duration.millis(200), overlay);
+        ft.setToValue(0.0);
+        ft.setOnFinished(e -> {
+            mainLayout.getChildren().remove(overlay);
+            onClose.run();
+        });
+        ft.play();
     }
 }
