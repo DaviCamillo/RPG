@@ -33,15 +33,15 @@ public class ShopNPC {
     private static final String FONT_PIXEL = "Press Start 2P";
 
     // ── Posição e tamanho do NPC no mapa ──────────────────────────────────
-    public static final double NPC_X    = 200;
-    public static final double NPC_Y    = 500;
-    public static final double NPC_SIZE = 70;
+    public static final double NPC_X    = 250;
+    public static final double NPC_Y    = 800;
+    public static final double NPC_SIZE = 200;
 
     // ── Raio de proximidade para abrir a loja ──────────────────────────────
     private static final double RAIO_COLISAO = 80;
 
     // ── Tempo de recarga (Cooldown) ────────────────────────────────────────
-    private static final long COOLDOWN_MS = 15000; // 15 segundos em milissegundos
+    private static final long COOLDOWN_MS = 3000; // 15 segundos em milissegundos
     private static long ultimoFechamento = 0;      // Registra quando a loja fechou por último
 
     // =========================================================================
