@@ -1,9 +1,11 @@
 package com.RPG.TheLastRoar.frontend.core;
 
+import com.RPG.TheLastRoar.App;
+
 import javafx.event.EventHandler;
+import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
-import javafx.scene.Scene;
 
 /**
  * AppKeyboardControls — Gerencia configuração de controles de teclado.

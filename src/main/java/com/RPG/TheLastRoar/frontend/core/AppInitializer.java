@@ -1,8 +1,9 @@
 package com.RPG.TheLastRoar.frontend.core;
-import com.RPG.TheLastRoar.backend.models.Sword;
-import com.RPG.TheLastRoar.backend.models.Character;
-import com.RPG.TheLastRoar.frontend.npc.ShopNPC;
+import com.RPG.TheLastRoar.App;
 import com.RPG.TheLastRoar.backend.managers.EnemyManager;
+import com.RPG.TheLastRoar.backend.models.Character;
+import com.RPG.TheLastRoar.backend.models.Sword;
+import com.RPG.TheLastRoar.frontend.npc.ShopNPC;
 import com.RPG.TheLastRoar.frontend.screens.HudManager;
 import com.RPG.TheLastRoar.frontend.screens.PauseMenu;
 

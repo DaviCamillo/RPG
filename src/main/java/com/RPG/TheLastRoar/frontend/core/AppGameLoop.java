@@ -1,5 +1,6 @@
 package com.RPG.TheLastRoar.frontend.core;
 
+import com.RPG.TheLastRoar.App;
 import com.RPG.TheLastRoar.backend.models.Monsters;
 import com.RPG.TheLastRoar.frontend.screens.Battle;
 

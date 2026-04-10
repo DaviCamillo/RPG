@@ -2,11 +2,11 @@ package com.RPG.TheLastRoar.frontend.screens;
 
 import java.util.List;
 
+import com.RPG.TheLastRoar.App;
 import com.RPG.TheLastRoar.backend.models.Character;
 import com.RPG.TheLastRoar.backend.models.Monsters;
 import com.RPG.TheLastRoar.backend.models.Potion;
 import com.RPG.TheLastRoar.frontend.controllers.BattleAnimations;
-import com.RPG.TheLastRoar.frontend.core.App;
 
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;

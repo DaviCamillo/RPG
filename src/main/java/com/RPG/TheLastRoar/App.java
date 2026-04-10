@@ -1,4 +1,4 @@
-package com.RPG.TheLastRoar.frontend.core;
+package com.RPG.TheLastRoar;
 
 
 import com.RPG.TheLastRoar.backend.managers.EnemyManager;
@@ -12,6 +12,11 @@ import com.RPG.TheLastRoar.frontend.screens.IntroScreen;
 import com.RPG.TheLastRoar.frontend.screens.InventoryScreen;
 import com.RPG.TheLastRoar.frontend.screens.PauseMenu;
 import com.RPG.TheLastRoar.frontend.screens.StartScreen;
+import com.RPG.TheLastRoar.frontend.core.AppGameLoop;
+import com.RPG.TheLastRoar.frontend.core.AppKeyboardControls;
+import com.RPG.TheLastRoar.frontend.core.AppGameState;
+import com.RPG.TheLastRoar.frontend.core.AppUIElements;
+import com.RPG.TheLastRoar.frontend.core.AppInitializer;
 
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
@@ -354,5 +359,4 @@ public class App extends javafx.application.Application {
 
     public static void main(String[] args) { launch(); }
 }
-
 

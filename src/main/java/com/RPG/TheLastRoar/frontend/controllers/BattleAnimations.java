@@ -1,6 +1,6 @@
 package com.RPG.TheLastRoar.frontend.controllers;
 
-import com.RPG.TheLastRoar.frontend.core.App;
+import com.RPG.TheLastRoar.App;
 import com.RPG.TheLastRoar.frontend.screens.Battle;
 import com.RPG.TheLastRoar.frontend.screens.BattleUI;
 

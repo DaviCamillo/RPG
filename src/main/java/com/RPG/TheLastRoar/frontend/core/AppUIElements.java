@@ -1,5 +1,7 @@
 package com.RPG.TheLastRoar.frontend.core;
 
+import com.RPG.TheLastRoar.App;
+
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
