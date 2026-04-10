@@ -1,4 +1,4 @@
-package com.RPG.TheLastRoar;
+package com.RPG.TheLastRoar.frontend.screens;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -376,3 +376,4 @@ public class StartScreen {
         return null;
     }
 }
+

@@ -1,4 +1,9 @@
-package com.RPG.TheLastRoar;
+package com.RPG.TheLastRoar.frontend.screens;
+import com.RPG.TheLastRoar.backend.models.Character;
+import com.RPG.TheLastRoar.backend.models.Sword;
+import com.RPG.TheLastRoar.backend.models.Armor;
+import com.RPG.TheLastRoar.backend.models.Potion;
+import com.RPG.TheLastRoar.backend.models.Item;
 
 import java.util.List;
 
@@ -417,3 +422,6 @@ public class InventoryScreen {
         ft.play();
     }
 }
+
+
+

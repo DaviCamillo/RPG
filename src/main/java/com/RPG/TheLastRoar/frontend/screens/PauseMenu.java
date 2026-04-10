@@ -1,4 +1,4 @@
-package com.RPG.TheLastRoar;
+package com.RPG.TheLastRoar.frontend.screens;
 
 import javafx.animation.FadeTransition;
 import javafx.geometry.Insets;
@@ -270,3 +270,4 @@ public class PauseMenu {
         }
     }
 }
+

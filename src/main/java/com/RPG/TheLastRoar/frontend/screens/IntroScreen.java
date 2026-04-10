@@ -1,4 +1,4 @@
-package com.RPG.TheLastRoar;
+package com.RPG.TheLastRoar.frontend.screens;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -262,3 +262,4 @@ public class IntroScreen {
         fadeOut.play();
     }
 }
+

@@ -1,4 +1,10 @@
-package com.RPG.TheLastRoar;
+package com.RPG.TheLastRoar.frontend.npc;
+
+import com.RPG.TheLastRoar.backend.models.Character;
+import com.RPG.TheLastRoar.backend.models.Item;
+import com.RPG.TheLastRoar.backend.models.Potion;
+import com.RPG.TheLastRoar.backend.models.Sword;
+import com.RPG.TheLastRoar.frontend.screens.HudManager;
 
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
@@ -403,3 +409,5 @@ public class ShopNPC {
         ft.play();
     }
 }
+
+
