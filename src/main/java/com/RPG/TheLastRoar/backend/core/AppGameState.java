@@ -1,4 +1,4 @@
-package com.RPG.TheLastRoar.frontend.core;
+package com.RPG.TheLastRoar.backend.core;
 
 import com.RPG.TheLastRoar.App;
 import com.RPG.TheLastRoar.backend.managers.SaveManager;

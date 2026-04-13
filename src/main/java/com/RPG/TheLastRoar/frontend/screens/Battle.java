@@ -7,6 +7,7 @@ import com.RPG.TheLastRoar.backend.models.Character;
 import com.RPG.TheLastRoar.backend.models.Monsters;
 import com.RPG.TheLastRoar.backend.models.Potion;
 import com.RPG.TheLastRoar.frontend.controllers.BattleAnimations;
+import com.RPG.TheLastRoar.frontend.effects.BattleEffects;
 
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
@@ -311,10 +312,32 @@ public class Battle {
             // Animação de ataque → lógica só roda após o visual terminar
             BattleAnimations.animarAtaque(playerImg, enemyImg, () -> {
                 int damage = playerChar.attack(monster);
+                // 20% de chance de crítico (baseado em chance, não em comparação de dano)
+                boolean isCritical = Math.random() < 0.20;
+                
                 BattleAnimations.animarHitFlash(enemyImg);
-                BattleAnimations.exibirDanoFlutuante(root, damage, false);
+                
+                // NOVOS EFEITOS: Números flutuantes, partículas e screen shake
+                double damageX = enemyImg.getLayoutX() + enemyImg.getFitWidth() / 2;
+                double damageY = enemyImg.getLayoutY() + enemyImg.getFitHeight() / 2;
+                
+                // Mostra número flutuante com tipo correto
+                String damageType = isCritical ? "CRITICAL" : "NORMAL";
+                BattleEffects.animateFloatingDamage(root, damageX, damageY, String.valueOf(damage), true, isCritical);
+                
+                // Partículas de impacto diferenciadas
+                BattleEffects.createImpactParticles(root, damageX, damageY, damageType);
+                
+                // Screen shake proporcional ao dano
+                if (isCritical) {
+                    BattleEffects.playScreenShake(root, "CRITICAL");
+                } else {
+                    BattleEffects.playScreenShake(root, "NORMAL");
+                }
+                
                 BattleUI.atualizarBarraHp(opponentStatus, monster.getLife(), monster.getMaxLife());
-                promptLabel.setText(playerChar.getName() + " causou " + damage + " de dano!");
+                String messagePrefix = isCritical ? " ACERTO CRÍTICO: " : " ";
+                promptLabel.setText(playerChar.getName() + messagePrefix + damage + " de dano!");
 
                 if (monster.getLife() <= 0) {
                     // ── Vitória ───────────────────────────────────────────
@@ -386,7 +409,18 @@ public class Battle {
                 playerChar.getInventory().removeItem(potion);
 
                 BattleUI.atualizarBarraHp(playerStatus, playerChar.getLife(), playerChar.getMaxLife());
-                BattleAnimations.exibirDanoFlutuante(root, potion.getHealedLife(), true);
+                
+                // NOVOS EFEITOS: Números flutuantes verdes, partículas de cura
+                double healX = playerImg.getLayoutX() + playerImg.getFitWidth() / 2;
+                double healY = playerImg.getLayoutY() + playerImg.getFitHeight() / 2;
+                
+                // Mostra número flutuante com tipo HEAL (verde)
+                BattleEffects.animateFloatingDamage(root, healX, healY, 
+                    "+" + potion.getHealedLife(), false, false); // false = não é dano, é cura
+                
+                // Partículas de cura (verde)
+                BattleEffects.createImpactParticles(root, healX, healY, "HEAL");
+                
                 promptLabel.setText("Usou " + potion.getName() + "!\n+" + potion.getHealedLife() + " HP");
                 if (hudManager != null) hudManager.atualizar(playerChar);
 
@@ -429,16 +463,40 @@ public class Battle {
                                           Label promptLabel, HudManager hudManager) {
 
         int damage = Math.max(0, monster.getDamage() - playerChar.getResistance());
+        boolean isCritical = Math.random() > 0.7; // 30% crítico
+        if (isCritical) damage = (int)(damage * 1.5);
+        
         playerChar.setLife(playerChar.getLife() - damage);
 
         // Atualiza a UI
         BattleUI.atualizarBarraHp(playerStatus, playerChar.getLife(), playerChar.getMaxLife());
         BattleAnimations.animarTremor(playerImg);
         BattleAnimations.animarHitFlash(playerImg);
-        BattleAnimations.exibirDanoFlutuante(root, damage, false);
+        
+        // NOVOS EFEITOS: Números flutuantes, partículas e screen shake
+        double damageX = playerImg.getLayoutX() + playerImg.getFitWidth() / 2;
+        double damageY = playerImg.getLayoutY() + playerImg.getFitHeight() / 2;
+        
+        // Mostra número flutuante com tipo correto
+        String damageType = isCritical ? "CRITICAL" : "NORMAL";
+        BattleEffects.animateFloatingDamage(root, damageX, damageY, String.valueOf(damage), true, isCritical);
+        
+        // Partículas de impacto diferenciadas
+        BattleEffects.createImpactParticles(root, damageX, damageY, damageType);
+        
+        // Screen shake proporcional ao dano
+        if (isCritical) {
+            BattleEffects.playScreenShake(root, "CRITICAL");
+        } else {
+            BattleEffects.playScreenShake(root, "NORMAL");
+        }
+        
         if (hudManager != null) hudManager.atualizar(playerChar);
 
-        promptLabel.setText(monster.getName() + " causou " + damage + " de dano!");
+        String message = isCritical 
+            ? monster.getName() + " causou " + damage + " de DANO CRÍTICO!"
+            : monster.getName() + " causou " + damage + " de dano!";
+        promptLabel.setText(message);
 
         if (playerChar.getLife() <= 0) {
             // Jogador morreu — exibe tela de Game Over

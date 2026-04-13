@@ -10,7 +10,10 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
 
 /**
@@ -341,6 +344,113 @@ public class BattleUI {
         if (ratio > 0.5) return "#2ECC71";  // Verde — saudável
         if (ratio > 0.2) return "#F39C12";  // Laranja — atenção
         return "#E74C3C";                   // Vermelho — perigo crítico
+    }
+
+    // =========================================================================
+    // GHOST DAMAGE BAR — Barra de vida segmentada com "dano fantasma"
+    // =========================================================================
+
+    /**
+     * Atualiza a barra de HP com efeito de "dano fantasma".
+     * 
+     * Implementação:
+     *   1. Barra principal vermelha/laranja = HP atual
+     *   2. Barra cinza translúcida = "dano fantasma" (diminui após 300ms)
+     *   3. Cria efeito de "suspenso" antes de desaparecer
+     *
+     * EXEMPLO VISUAL:
+     *   Antes: [████████████░░░░░░░] HP 100/120
+     *   Ataque desferido: Recebe 25 de dano
+     *   Depois: [███████░░░░░░░░░░░░] HP 75/120
+     *           └─────────┬─────────┘
+     *           Ghost zone (cinza, desaparece em 300ms)
+     *
+     * @param status VBox do status
+     * @param hp     HP atual após o dano
+     * @param hpMax  HP máximo
+     * @param damageReceived Quantidade de dano recebido (para calcular ghost bar)
+     */
+    public static void atualizarBarraHpComGhostDamage(VBox status, int hp, int hpMax, int damageReceived) {
+        ProgressBar bar = (ProgressBar) status.lookup("#hpBar");
+        double currentRatio = Math.max(0.0, (double) hp / Math.max(1, hpMax));
+        
+        if (bar != null) {
+            // Calcula o tamanho da "ghost bar" (dano fantasma)
+            double ghostRatio = Math.max(0.0, (double) damageReceived / Math.max(1, hpMax));
+            double totalRatio = currentRatio + ghostRatio;
+
+            // Anima a barra principal (HP atual)
+            Timeline animation = new Timeline(
+                new KeyFrame(Duration.ZERO,
+                    new KeyValue(bar.progressProperty(), bar.getProgress())),
+                new KeyFrame(Duration.millis(400),
+                    new KeyValue(bar.progressProperty(), currentRatio))
+            );
+            animation.play();
+
+            // Atualiza cor baseada em HP atual
+            bar.setStyle(
+                "-fx-accent: " + calcularCorHp(currentRatio) + ";" +
+                "-fx-control-inner-background: #1a1a2e;" +
+                "-fx-box-border: transparent;"
+            );
+        }
+
+        // Atualiza o texto numérico HP se presente
+        Label textLabel = (Label) status.lookup("#hpText");
+        if (textLabel != null) {
+            textLabel.setText(Math.max(0, hp) + " / " + hpMax);
+        }
+
+        // Anima a ghost bar (cinza) que desaparece após 300ms
+        StackPane ghostContainer = (StackPane) status.lookup("#ghostDamageContainer");
+        if (ghostContainer != null && damageReceived > 0) {
+            animateGhostDamageBar(ghostContainer, currentRatio, (double) damageReceived / Math.max(1, hpMax));
+        }
+    }
+
+    /**
+     * Anima o desaparecimento da barra de "dano fantasma".
+     * Usado internamente por atualizarBarraHpComGhostDamage().
+     *
+     * @param container Container que possui a ghost bar
+     * @param currentRatio Ratio de HP atual (0.0-1.0)
+     * @param ghostRatio Ratio do dano fantasma (0.0-1.0)
+     */
+    private static void animateGhostDamageBar(StackPane container, double currentRatio, double ghostRatio) {
+        // Procura a ghost bar existente
+        Rectangle ghostBar = null;
+        for (int i = 0; i < container.getChildren().size(); i++) {
+            if (container.getChildren().get(i).getId() != null &&
+                container.getChildren().get(i).getId().equals("ghostBar")) {
+                ghostBar = (Rectangle) container.getChildren().get(i);
+                break;
+            }
+        }
+
+        // Se não existe, cria uma
+        final Rectangle finalGhostBar;
+        if (ghostBar == null) {
+            finalGhostBar = new Rectangle();
+            finalGhostBar.setId("ghostBar");
+            finalGhostBar.setFill(Color.web("#888888"));
+            finalGhostBar.setOpacity(0.5);
+            container.getChildren().add(finalGhostBar);
+        } else {
+            finalGhostBar = ghostBar;
+        }
+
+        // Anima fade-out da ghost bar após 300ms
+        Timeline ghostAnimation = new Timeline(
+            new KeyFrame(Duration.ZERO,
+                new KeyValue(finalGhostBar.opacityProperty(), 0.5)),
+            new KeyFrame(Duration.millis(300),
+                new KeyValue(finalGhostBar.opacityProperty(), 0.5)),
+            new KeyFrame(Duration.millis(600),
+                new KeyValue(finalGhostBar.opacityProperty(), 0.0))
+        );
+        ghostAnimation.setOnFinished(e -> container.getChildren().remove(finalGhostBar));
+        ghostAnimation.play();
     }
 }
 

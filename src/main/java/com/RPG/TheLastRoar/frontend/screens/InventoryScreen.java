@@ -1,20 +1,24 @@
 package com.RPG.TheLastRoar.frontend.screens;
-import com.RPG.TheLastRoar.backend.models.Character;
-import com.RPG.TheLastRoar.backend.models.Sword;
-import com.RPG.TheLastRoar.backend.models.Armor;
-import com.RPG.TheLastRoar.backend.models.Potion;
-import com.RPG.TheLastRoar.backend.models.Item;
-
 import java.util.List;
+import java.util.stream.Collectors;
+
+import com.RPG.TheLastRoar.backend.models.Armor;
+import com.RPG.TheLastRoar.backend.models.Character;
+import com.RPG.TheLastRoar.backend.models.Item;
+import com.RPG.TheLastRoar.backend.models.Potion;
+import com.RPG.TheLastRoar.backend.models.Sword;
 
 import javafx.animation.FadeTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -39,85 +43,105 @@ public class InventoryScreen {
     // =========================================================================
 
     public static void open(StackPane mainLayout, Character player, Runnable onClose) {
-        VBox painelInventario = construirPainel(player, () ->
+        VBox painelInventario = construirPainelModerno(player, () ->
             fechar(mainLayout, onClose)
         );
 
         StackPane overlay = new StackPane(painelInventario);
-        overlay.setStyle("-fx-background-color: rgba(0, 0, 0, 0.80);");
+        overlay.setStyle("-fx-background-color: rgba(0, 0, 0, 0.85);");
         overlay.setAlignment(Pos.CENTER_LEFT);
 
         overlay.setOpacity(0);
         mainLayout.getChildren().add(overlay);
 
-        FadeTransition ft = new FadeTransition(Duration.millis(250), overlay);
+        FadeTransition ft = new FadeTransition(Duration.millis(300), overlay);
         ft.setToValue(1.0);
         ft.play();
     }
 
     // =========================================================================
-    // CONSTRUÇÃO DO PAINEL PRINCIPAL
+    // CONSTRUÇÃO DO PAINEL MODERNO COM FILTROS E BUSCA
     // =========================================================================
 
-    private static VBox construirPainel(Character player, Runnable onClose) {
-        VBox painel = new VBox(0);
-        painel.setAlignment(Pos.CENTER_LEFT);
-        painel.setPadding(new Insets(0, 0, 0, 120));
-
-        // ── Título ────────────────────────────────────────────────────────
-        Text titulo = new Text("INVENTÁRIO");
-        titulo.setFont(Font.font(FONT_PIXEL, FontWeight.NORMAL, 28)); // Tamanho reduzido para pixel font
-        titulo.setFill(Color.web("#F0E6C0"));
-        DropShadow sombraTitulo = new DropShadow();
-        sombraTitulo.setColor(Color.web("#C8A000", 0.8));
-        sombraTitulo.setRadius(24);
-        sombraTitulo.setSpread(0.12);
-        titulo.setEffect(sombraTitulo);
-        VBox.setMargin(titulo, new Insets(0, 0, 12, 0));
-        painel.getChildren().add(titulo);
-
-        // ── Linha decorativa dourada ──────────────────────────────────────
-        Line separador = new Line(0, 0, 280, 0);
-        separador.setStroke(Color.web("#B8960C", 0.6));
-        separador.setStrokeWidth(1.0);
-        VBox.setMargin(separador, new Insets(4, 0, 24, 0));
-        painel.getChildren().add(separador);
-
-        // ── Seção: Equipamentos atuais ────────────────────────────────────
-        Text labelEquipados = new Text("EQUIPADO");
-        labelEquipados.setFont(Font.font(FONT_PIXEL, FontWeight.NORMAL, 12));
-        labelEquipados.setFill(Color.web("#888070"));
-        VBox.setMargin(labelEquipados, new Insets(0, 0, 12, 0));
-        painel.getChildren().add(labelEquipados);
-
-        HBox slotEspada = criarSlotEquipado(
-            "⚔  Espada",
-            player.getSword() != null ? player.getSword().getName() : "Nenhuma",
-            "#C8A000"
+    private static VBox construirPainelModerno(Character player, Runnable onClose) {
+        VBox painel = new VBox(16);
+        painel.setPadding(new Insets(40, 60, 40, 140));
+        painel.setStyle(
+            "-fx-background-color: rgba(15, 12, 30, 0.95);" +
+            "-fx-background-radius: 16;" +
+            "-fx-border-color: #C8A000;" +
+            "-fx-border-width: 2;" +
+            "-fx-border-radius: 16;"
         );
-        VBox.setMargin(slotEspada, new Insets(0, 0, 8, 0));
-        painel.getChildren().add(slotEspada);
+        painel.setMaxWidth(920);
 
-        HBox slotArmadura = criarSlotEquipado(
-            "🛡  Armadura",
-            player.getEquippedArmor() != null ? player.getEquippedArmor().getName() : "Nenhuma",
-            "#4A90D9"
+        // ── HEADER ─────────────────────────────────────────────────────────
+        VBox header = criarHeader();
+        painel.getChildren().add(header);
+
+        // ── FILTROS ────────────────────────────────────────────────────────
+        HBox filtros = criarFiltros();
+        painel.getChildren().add(filtros);
+
+        // ── BUSCA ──────────────────────────────────────────────────────────
+        TextField searchBar = criarBarraBusca();
+        painel.getChildren().add(searchBar);
+
+        // ── EQUIPADOS ──────────────────────────────────────────────────────
+        VBox equipados = criarSecaoEquipados(player);
+        painel.getChildren().add(equipados);
+
+        // ── INVENTÁRIO (SCROLLABLE) ────────────────────────────────────────
+        VBox inventarioArea = new VBox(12);
+        inventarioArea.setStyle("-fx-fill-height: true;");
+        
+        ScrollPane scrollItens = new ScrollPane();
+        scrollItens.setContent(inventarioArea);
+        scrollItens.setFitToWidth(true);
+        scrollItens.setStyle(
+            "-fx-control-inner-background: rgba(10, 8, 20, 0.7);" +
+            "-fx-border-color: #C8A000;" +
+            "-fx-border-width: 1;" +
+            "-fx-border-radius: 8;" +
+            "-fx-padding: 12;"
         );
-        VBox.setMargin(slotArmadura, new Insets(0, 0, 24, 0));
-        painel.getChildren().add(slotArmadura);
+        scrollItens.setPrefHeight(300);
+        VBox.setVgrow(scrollItens, Priority.ALWAYS);
+        painel.getChildren().add(scrollItens);
 
-        // ── Seção: Itens no inventário ────────────────────────────────────
-        Text labelItens = new Text("ITENS NO INVENTÁRIO");
-        labelItens.setFont(Font.font(FONT_PIXEL, FontWeight.NORMAL, 12));
-        labelItens.setFill(Color.web("#888070"));
-        VBox.setMargin(labelItens, new Insets(0, 0, 14, 0));
-        painel.getChildren().add(labelItens);
+        // ── CONTROLE DE FILTROS E BUSCA ────────────────────────────────────
+        final String[] filtroAtivo = {"TODOS"};
 
-        GridPane grade = construirGradeItens(player, slotEspada, slotArmadura);
-        VBox.setMargin(grade, new Insets(0, 0, 28, 0));
-        painel.getChildren().add(grade);
+        Runnable atualizarItens = () -> {
+            inventarioArea.getChildren().clear();
+            List<Item> itens = filtrarItens(player, filtroAtivo[0], searchBar.getText());
+            if (itens.isEmpty()) {
+                Label vazio = new Label("Nenhum item encontrado");
+                vazio.setStyle("-fx-text-fill: #888070; -fx-font-size: 12;");
+                inventarioArea.getChildren().add(vazio);
+            } else {
+                GridPane grade = construirGradeItensModerna(player, itens);
+                inventarioArea.getChildren().add(grade);
+            }
+        };
 
-        // ── Botão fechar ──────────────────────────────────────────────────
+        // EVENT: Filtros
+        for (javafx.scene.Node node : filtros.getChildren()) {
+            if (node instanceof Button btn) {
+                btn.setOnAction(e -> {
+                    filtroAtivo[0] = btn.getText();
+                    atualizarItens.run();
+                });
+            }
+        }
+
+        // EVENT: Busca
+        searchBar.textProperty().addListener((obs, old, newVal) -> atualizarItens.run());
+
+        // Carga inicial
+        atualizarItens.run();
+
+        // ── BOTÃO FECHAR ───────────────────────────────────────────────────
         Button btnFechar = criarBotaoFechar();
         btnFechar.setOnAction(e -> onClose.run());
         painel.getChildren().add(btnFechar);
@@ -126,279 +150,330 @@ public class InventoryScreen {
     }
 
     // =========================================================================
-    // GRADE DE ITENS
+    // COMPONENTES MODERNOS
     // =========================================================================
 
-    private static GridPane construirGradeItens(Character player,
-                                                 HBox slotEspada, HBox slotArmadura) {
-        GridPane grade = new GridPane();
-        grade.setHgap(12);
-        grade.setVgap(12);
-
-        List<Item> itens = player.getInventory().getItems();
-
-        if (itens.isEmpty()) {
-            Label vazio = new Label("O inventário está vazio.");
-            vazio.setFont(Font.font(FONT_PIXEL, 10));
-            vazio.setTextFill(Color.web("#888070"));
-            grade.add(vazio, 0, 0);
-            return grade;
-        }
-
-        for (int i = 0; i < itens.size(); i++) {
-            final Item item = itens.get(i);
-            boolean estaEquipado = verificarEquipado(player, item);
-
-            VBox card = criarCardItem(item, estaEquipado);
-
-            card.setOnMouseClicked(e -> {
-                if (item instanceof Sword espada) {
-                    if (player.getSword() == espada) {
-                        player.setSword(null);
-                        atualizarTextoSlot(slotEspada, "Nenhuma");
-                        card.setStyle(estiloNormal(item));
-                        removerBadgeEquipado(card);
-                    } else {
-                        player.setSword(espada);
-                        atualizarTextoSlot(slotEspada, espada.getName());
-                        resetarDestaqueEspadasNaGrade(grade, player);
-                        card.setStyle(estiloEquipado(item));
-                        adicionarBadgeEquipado(card);
-                    }
-
-                } else if (item instanceof Armor armadura) {
-                    if (player.getEquippedArmor() == armadura) {
-                        player.setEquippedArmor(null);
-                        atualizarTextoSlot(slotArmadura, "Nenhuma");
-                        card.setStyle(estiloNormal(item));
-                        removerBadgeEquipado(card);
-                    } else {
-                        player.setEquippedArmor(armadura);
-                        atualizarTextoSlot(slotArmadura, armadura.getName());
-                        resetarDestaqueArmadurasNaGrade(grade, player);
-                        card.setStyle(estiloEquipado(item));
-                        adicionarBadgeEquipado(card);
-                    }
-                }
-            });
-
-            int coluna = i % 4;
-            int linha  = i / 4;
-            grade.add(card, coluna, linha);
-        }
-
-        return grade;
+    private static VBox criarHeader() {
+        VBox header = new VBox(8);
+        
+        Text titulo = new Text("INVENTÁRIO");
+        titulo.setFont(Font.font(FONT_PIXEL, FontWeight.BOLD, 28));
+        titulo.setFill(Color.web("#F0E6C0"));
+        DropShadow sombra = new DropShadow();
+        sombra.setColor(Color.web("#C8A000"));
+        sombra.setRadius(12);
+        titulo.setEffect(sombra);
+        
+        Line sep = new Line(0, 0, 280, 0);
+        sep.setStroke(Color.web("#C8A000"));
+        sep.setStrokeWidth(1.5);
+        
+        header.getChildren().addAll(titulo, sep);
+        return header;
     }
 
-    // =========================================================================
-    // CARD VISUAL DO ITEM
-    // =========================================================================
-
-    private static VBox criarCardItem(Item item, boolean equipado) {
-        VBox card = new VBox(8);
-        card.setAlignment(Pos.CENTER);
-        card.setPadding(new Insets(12, 14, 12, 14));
-        card.setPrefSize(140, 100); // Aumentado levemente para caber a pixel font
-        card.setMaxSize(140, 100);
-        card.setStyle(equipado ? estiloEquipado(item) : estiloNormal(item));
-        card.setCursor(javafx.scene.Cursor.HAND);
-        card.setUserData(item);
-
-        // ── Ícone do tipo (Mantido como Emoji para não quebrar) ────────────
-        Label icone = new Label(iconeItem(item));
-        icone.setFont(Font.font("Segoe UI Emoji", 24));
-
-        // ── Nome ───────────────────────────────────────────────────────────
-        Label nome = new Label(item.getName());
-        nome.setFont(Font.font(FONT_PIXEL, FontWeight.NORMAL, 8));
-        nome.setTextFill(Color.web("#E8DFC0"));
-        nome.setWrapText(true);
-        nome.setMaxWidth(120);
-        nome.setAlignment(Pos.CENTER);
-
-        // ── Atributo principal ─────────────────────────────────────────────
-        Label lblAtributo = new Label(atributoItem(item));
-        lblAtributo.setFont(Font.font(FONT_PIXEL, FontWeight.NORMAL, 7));
-        lblAtributo.setTextFill(Color.web("#888070"));
-
-        card.getChildren().addAll(icone, nome, lblAtributo);
-
-        if (equipado) adicionarBadgeEquipado(card);
-
-        card.setOnMouseEntered(e -> card.setOpacity(0.85));
-        card.setOnMouseExited(e  -> card.setOpacity(1.0));
-
-        return card;
+    private static HBox criarFiltros() {
+        HBox filtros = new HBox(12);
+        filtros.setAlignment(Pos.CENTER_LEFT);
+        
+        String[] categorias = {"TODOS", "EQUIPAMENTOS", "CONSUMÍVEIS"};
+        for (String cat : categorias) {
+            Button btn = criarBotaoFiltro(cat);
+            filtros.getChildren().add(btn);
+        }
+        
+        return filtros;
     }
 
-    private static void adicionarBadgeEquipado(VBox card) {
-        card.getChildren().removeIf(n -> "badge_equipado".equals(n.getId()));
-
-        Label badge = new Label("EQUIPADO");
-        badge.setId("badge_equipado");
-        badge.setFont(Font.font(FONT_PIXEL, FontWeight.NORMAL, 7));
-        badge.setTextFill(Color.web("#00E5E5"));
-        badge.setStyle(
-            "-fx-background-color: rgba(0,200,200,0.15);" +
-            "-fx-padding: 4 6;" +
-            "-fx-background-radius: 4;"
+    private static Button criarBotaoFiltro(String categoria) {
+        Button btn = new Button(categoria);
+        btn.setPrefSize(140, 36);
+        btn.setFont(Font.font(FONT_PIXEL, FontWeight.BOLD, 11));
+        btn.setStyle(
+            "-fx-background-color: rgba(50, 40, 60, 0.8);" +
+            "-fx-text-fill: #B0A080;" +
+            "-fx-border-color: #664400;" +
+            "-fx-border-width: 1;" +
+            "-fx-border-radius: 6;" +
+            "-fx-background-radius: 6;" +
+            "-fx-cursor: hand;"
         );
-        card.getChildren().add(badge);
+        
+        btn.setOnMouseEntered(e ->
+            btn.setStyle(
+                "-fx-background-color: rgba(100, 80, 120, 0.9);" +
+                "-fx-text-fill: #F0E6C0;" +
+                "-fx-border-color: #C8A000;" +
+                "-fx-border-width: 2;" +
+                "-fx-border-radius: 6;" +
+                "-fx-background-radius: 6;" +
+                "-fx-cursor: hand;"
+            )
+        );
+        btn.setOnMouseExited(e ->
+            btn.setStyle(
+                "-fx-background-color: rgba(50, 40, 60, 0.8);" +
+                "-fx-text-fill: #B0A080;" +
+                "-fx-border-color: #664400;" +
+                "-fx-border-width: 1;" +
+                "-fx-border-radius: 6;" +
+                "-fx-background-radius: 6;" +
+                "-fx-cursor: hand;"
+            )
+        );
+        
+        return btn;
     }
 
-    private static void removerBadgeEquipado(VBox card) {
-        card.getChildren().removeIf(n -> "badge_equipado".equals(n.getId()));
+    private static TextField criarBarraBusca() {
+        TextField search = new TextField();
+        search.setPromptText("🔍 Buscar item...");
+        search.setPrefHeight(40);
+        search.setStyle(
+            "-fx-font-family: '" + FONT_PIXEL + "', monospace;" +
+            "-fx-font-size: 11;" +
+            "-fx-background-color: rgba(30, 25, 50, 0.9);" +
+            "-fx-text-fill: #E8DFC0;" +
+            "-fx-padding: 8 14;" +
+            "-fx-border-color: #C8A000;" +
+            "-fx-border-width: 1;" +
+            "-fx-border-radius: 8;" +
+            "-fx-background-radius: 8;" +
+            "-fx-control-inner-background: rgba(30, 25, 50, 0.9);"
+        );
+        
+        return search;
     }
 
-    // =========================================================================
-    // VERIFICAÇÃO DE EQUIPAMENTO
-    // =========================================================================
+    private static Button criarBotaoFechar() {
+        Button btn = new Button("FECHAR");
+        btn.setPrefWidth(200);
+        btn.setPrefHeight(40);
+        btn.setStyle(
+            "-fx-font-family: '" + FONT_PIXEL + "';" +
+            "-fx-font-size: 12;" +
+            "-fx-background-color: rgba(50, 40, 60, 0.8);" +
+            "-fx-text-fill: #B0A080;" +
+            "-fx-border-color: #664400;" +
+            "-fx-border-width: 1;" +
+            "-fx-border-radius: 8;" +
+            "-fx-background-radius: 8;" +
+            "-fx-cursor: hand;"
+        );
 
-    private static boolean verificarEquipado(Character player, Item item) {
-        if (player == null) return false;
-        if (item instanceof Sword  && player.getSword()         == item) return true;
-        if (item instanceof Armor  && player.getEquippedArmor() == item) return true;
-        return false;
+        btn.setOnMouseEntered(e ->
+            btn.setStyle(
+                "-fx-font-family: '" + FONT_PIXEL + "';" +
+                "-fx-font-size: 12;" +
+                "-fx-background-color: rgba(100, 80, 120, 0.9);" +
+                "-fx-text-fill: #F0E6C0;" +
+                "-fx-border-color: #C8A000;" +
+                "-fx-border-width: 2;" +
+                "-fx-border-radius: 8;" +
+                "-fx-background-radius: 8;" +
+                "-fx-cursor: hand;"
+            )
+        );
+        btn.setOnMouseExited(e ->
+            btn.setStyle(
+                "-fx-font-family: '" + FONT_PIXEL + "';" +
+                "-fx-font-size: 12;" +
+                "-fx-background-color: rgba(50, 40, 60, 0.8);" +
+                "-fx-text-fill: #B0A080;" +
+                "-fx-border-color: #664400;" +
+                "-fx-border-width: 1;" +
+                "-fx-border-radius: 8;" +
+                "-fx-background-radius: 8;" +
+                "-fx-cursor: hand;"
+            )
+        );
+
+        return btn;
     }
 
-    private static void resetarDestaqueEspadasNaGrade(GridPane grade, Character player) {
-        grade.getChildren().forEach(node -> {
-            if (node instanceof VBox card) {
-                Object userData = card.getUserData();
-                if (userData instanceof Sword espada && espada != player.getSword()) {
-                    card.setStyle(estiloNormal(espada));
-                    removerBadgeEquipado(card);
-                }
-            }
-        });
+    private static VBox criarSecaoEquipados(Character player) {
+        VBox secao = new VBox(12);
+        
+        Text titulo = new Text("⚔ EQUIPADO");
+        titulo.setFont(Font.font(FONT_PIXEL, FontWeight.BOLD, 13));
+        titulo.setFill(Color.web("#888070"));
+        
+        HBox slots = new HBox(12);
+        slots.setAlignment(Pos.CENTER_LEFT);
+        
+        HBox slotEspada = criarSlotEquipado(
+            player.getSword() != null ? player.getSword().getName() : "Nenhuma",
+            "#C8A000"
+        );
+        slots.getChildren().add(slotEspada);
+        
+        HBox slotArmadura = criarSlotEquipado(
+            player.getEquippedArmor() != null ? player.getEquippedArmor().getName() : "Nenhuma",
+            "#4A90D9"
+        );
+        slots.getChildren().add(slotArmadura);
+        
+        secao.getChildren().addAll(titulo, slots);
+        return secao;
     }
 
-    private static void resetarDestaqueArmadurasNaGrade(GridPane grade, Character player) {
-        grade.getChildren().forEach(node -> {
-            if (node instanceof VBox card) {
-                Object userData = card.getUserData();
-                if (userData instanceof Armor armadura && armadura != player.getEquippedArmor()) {
-                    card.setStyle(estiloNormal(armadura));
-                    removerBadgeEquipado(card);
-                }
-            }
-        });
-    }
-
-    // =========================================================================
-    // SLOT DE EQUIPAMENTO 
-    // =========================================================================
-
-    private static HBox criarSlotEquipado(String tipoSlot, String nomeItem, String corDestaque) {
-        HBox slot = new HBox(14);
+    private static HBox criarSlotEquipado(String itemName, String color) {
+        HBox slot = new HBox(8);
         slot.setAlignment(Pos.CENTER_LEFT);
+        slot.setPadding(new Insets(10, 14, 10, 14));
         slot.setStyle(
-            "-fx-background-color: rgba(20,20,20,0.7);" +
-            "-fx-border-color: " + corDestaque + " transparent transparent transparent;" +
-            "-fx-border-width: 0 0 0 3;" +
-            "-fx-padding: 10 16;" +
-            "-fx-background-radius: 6;"
+            "-fx-background-color: rgba(25, 20, 40, 0.8);" +
+            "-fx-border-color: " + color + ";" +
+            "-fx-border-width: 1;" +
+            "-fx-border-radius: 8;" +
+            "-fx-background-radius: 8;"
         );
-        slot.setMaxWidth(380);
-
-        Label lblTipo = new Label(tipoSlot);
-        // O ícone do tipoSlot ("⚔  Espada") requer uma fonte que suporte emoji na primeira letra
-        // Vou manter em Segoe UI aqui para não bugar o emoji e a formatação misturada.
-        lblTipo.setFont(Font.font("Segoe UI", FontWeight.BOLD, 15));
-        lblTipo.setTextFill(Color.web("#888070"));
-        lblTipo.setMinWidth(110);
-
-        Label lblNome = new Label(nomeItem);
-        lblNome.setId("nomeEquipado"); 
-        lblNome.setFont(Font.font(FONT_PIXEL, FontWeight.NORMAL, 10)); // Fonte pixel
-        lblNome.setTextFill(Color.web("#E8DFC0"));
-
-        slot.getChildren().addAll(lblTipo, lblNome);
+        slot.setPrefWidth(220);
+        
+        Label nome = new Label(itemName);
+        nome.setFont(Font.font(FONT_PIXEL, FontWeight.BOLD, 11));
+        nome.setTextFill(Color.web(color));
+        
+        slot.getChildren().add(nome);
         return slot;
     }
 
-    private static void atualizarTextoSlot(HBox slot, String novoNome) {
-        slot.getChildren().stream()
-            .filter(n -> n instanceof Label lbl && "nomeEquipado".equals(lbl.getId()))
-            .map(n -> (Label) n)
-            .findFirst()
-            .ifPresent(lbl -> lbl.setText(novoNome));
+    // =========================================================================
+    // FILTROS E BUSCA
+    // =========================================================================
+
+    private static List<Item> filtrarItens(Character player, String categoria, String busca) {
+        List<Item> itens = player.getInventory().getItems();
+        
+        // Filtra por categoria
+        itens = itens.stream().filter(item -> {
+            if (categoria.equals("TODOS")) return true;
+            if (categoria.equals("EQUIPAMENTOS")) return item instanceof Sword || item instanceof Armor;
+            if (categoria.equals("CONSUMÍVEIS")) return item instanceof Potion;
+            return true;
+        }).collect(Collectors.toList());
+        
+        // Filtra por busca
+        if (busca != null && !busca.isEmpty()) {
+            String buscaLower = busca.toLowerCase();
+            itens = itens.stream()
+                .filter(item -> item.getName().toLowerCase().contains(buscaLower))
+                .collect(Collectors.toList());
+        }
+        
+        return itens;
     }
 
     // =========================================================================
-    // ESTILOS DOS CARDS
+    // GRADE DE ITENS MODERNA
     // =========================================================================
 
-    private static String estiloNormal(Item item) {
-        return "-fx-background-color: rgba(20,20,20,0.75);" +
-               "-fx-border-color: " + corBorda(item) + ";" +
-               "-fx-border-width: 1.5;" +
-               "-fx-border-radius: 8;" +
-               "-fx-background-radius: 8;";
-    }
-
-    private static String estiloEquipado(Item item) {
-        return "-fx-background-color: rgba(0,180,180,0.18);" +
-               "-fx-border-color: #00E5E5;" +
-               "-fx-border-width: 2;" +
-               "-fx-border-radius: 8;" +
-               "-fx-background-radius: 8;";
-    }
-
-    private static String corBorda(Item item) {
-        if (item instanceof Sword)  return "#8B7028"; 
-        if (item instanceof Armor)  return "#2A5A8B"; 
-        if (item instanceof Potion) return "#2A7A3A"; 
-        return "#443E30";
-    }
-
-    private static String iconeItem(Item item) {
-        if (item instanceof Sword)  return "⚔";
-        if (item instanceof Armor)  return "🛡";
-        if (item instanceof Potion) return "🧪";
-        return "📦";
-    }
-
-    private static String atributoItem(Item item) {
-        if (item instanceof Sword s)  return "Dano: " + s.getDamage();
-        if (item instanceof Armor a)  return "Defesa: " + a.getResistance();
-        if (item instanceof Potion p) return "Cura: " + p.getHealedLife();
-        return "Valor: " + item.getValue();
-    }
-
-    // =========================================================================
-    // BOTÃO FECHAR
-    // =========================================================================
-
-    private static Button criarBotaoFechar() {
-        Button btn = new Button("   FECHAR");
-        btn.setPrefWidth(240);
-        btn.setPrefHeight(48);
-        btn.setAlignment(Pos.CENTER_LEFT);
-
-        final String estNormal =
-            "-fx-background-color: transparent;" +
-            "-fx-text-fill: #D8D0C0;" +
-            "-fx-padding: 0 0 0 20;" +
-            "-fx-cursor: hand;" +
-            "-fx-border-color: transparent;" +
-            "-fx-font-family: '" + FONT_PIXEL + "';" +
-            "-fx-font-size: 14px;";
+    private static GridPane construirGradeItensModerna(Character player, List<Item> itens) {
+        GridPane grade = new GridPane();
+        grade.setHgap(12);
+        grade.setVgap(12);
+        
+        int col = 0, row = 0;
+        for (Item item : itens) {
+            VBox cardItem = criarCardItemModerno(item, player);
+            grade.add(cardItem, col, row);
             
-        final String estHover =
-            "-fx-background-color: rgba(0, 210, 210, 0.15);" +
-            "-fx-text-fill: white;" +
-            "-fx-padding: 0 0 0 20;" +
-            "-fx-cursor: hand;" +
-            "-fx-border-width: 0 0 0 3;" +
-            "-fx-border-color: transparent;" +
-            "-fx-font-family: '" + FONT_PIXEL + "';" +
-            "-fx-font-size: 14px;";
+            col++;
+            if (col >= 3) { col = 0; row++; }
+        }
+        
+        return grade;
+    }
 
-        btn.setStyle(estNormal);
-        btn.setOnMouseEntered(e -> { btn.setStyle(estHover);  btn.setText("> FECHAR"); });
-        btn.setOnMouseExited(e ->  { btn.setStyle(estNormal); btn.setText("  FECHAR"); });
-        return btn;
+    private static VBox criarCardItemModerno(Item item, Character player) {
+        VBox card = new VBox(8);
+        card.setPadding(new Insets(12, 12, 12, 12));
+        card.setStyle(
+            "-fx-background-color: rgba(35, 30, 50, 0.9);" +
+            "-fx-border-color: #664400;" +
+            "-fx-border-width: 1;" +
+            "-fx-border-radius: 8;" +
+            "-fx-background-radius: 8;"
+        );
+        card.setPrefWidth(200);
+        card.setCursor(javafx.scene.Cursor.HAND);
+        
+        Label nome = new Label(item.getName());
+        nome.setFont(Font.font(FONT_PIXEL, FontWeight.BOLD, 11));
+        nome.setTextFill(Color.web("#E8DFC0"));
+        
+        String atributos = gerarAtributos(item);
+        Label desc = new Label(atributos);
+        desc.setFont(Font.font(FONT_PIXEL, 9));
+        desc.setTextFill(Color.web("#B0A080"));
+        desc.setWrapText(true);
+        
+        Label comparacao = gerarComparacao(item, player);
+        if (comparacao != null) {
+            comparacao.setFont(Font.font(FONT_PIXEL, 9));
+            comparacao.setWrapText(true);
+            card.getChildren().add(comparacao);
+        }
+        
+        card.getChildren().addAll(nome, desc);
+        
+        card.setOnMouseEntered(e -> {
+            card.setStyle(
+                "-fx-background-color: rgba(60, 50, 80, 0.95);" +
+                "-fx-border-color: #C8A000;" +
+                "-fx-border-width: 2;" +
+                "-fx-border-radius: 8;" +
+                "-fx-background-radius: 8;"
+            );
+        });
+        card.setOnMouseExited(e -> {
+            card.setStyle(
+                "-fx-background-color: rgba(35, 30, 50, 0.9);" +
+                "-fx-border-color: #664400;" +
+                "-fx-border-width: 1;" +
+                "-fx-border-radius: 8;" +
+                "-fx-background-radius: 8;"
+            );
+        });
+        
+        return card;
+    }
+
+    private static String gerarAtributos(Item item) {
+        if (item instanceof Sword s) {
+            return "Dano: " + s.getDamage();
+        } else if (item instanceof Armor a) {
+            return "Defesa: " + a.getResistance();
+        } else if (item instanceof Potion p) {
+            return "Cura: +" + p.getHealedLife() + " HP";
+        }
+        return "";
+    }
+
+    private static Label gerarComparacao(Item item, Character player) {
+        Label label = null;
+        
+        if (item instanceof Sword sword) {
+            Sword equipada = player.getSword();
+            if (equipada != null) {
+                int diff = sword.getDamage() - equipada.getDamage();
+                String cor = diff > 0 ? "#44FF44" : (diff < 0 ? "#FF4444" : "#FFFFFF");
+                String sinal = diff > 0 ? "+" : "";
+                label = new Label(sinal + diff + " Dano");
+                label.setTextFill(Color.web(cor));
+            }
+        } else if (item instanceof Armor armor) {
+            Armor equipada = player.getEquippedArmor();
+            if (equipada != null) {
+                int diff = armor.getResistance() - equipada.getResistance();
+                String cor = diff > 0 ? "#44FF44" : (diff < 0 ? "#FF4444" : "#FFFFFF");
+                String sinal = diff > 0 ? "+" : "";
+                label = new Label(sinal + diff + " Defesa");
+                label.setTextFill(Color.web(cor));
+            }
+        }
+        
+        return label;
     }
 
     // =========================================================================

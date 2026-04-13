@@ -86,14 +86,18 @@ public class ShopNPC {
             return false;
         }
 
-        double npcCentroX  = NPC_X + NPC_SIZE / 2;
-        double npcCentroY  = NPC_Y + NPC_SIZE / 2;
+        double npcCentroX = NPC_X + NPC_SIZE / 2;
+        double npcCentroY = NPC_Y + NPC_SIZE / 2;
         double playerCentroX = playerX + 40;
         double playerCentroY = playerY + 40;
 
         double dx = playerCentroX - npcCentroX;
         double dy = playerCentroY - npcCentroY;
-        return Math.sqrt(dx * dx + dy * dy) < RAIO_COLISAO;
+
+        // OTIMIZAÇÃO: usa squared distance para evitar Math.sqrt()
+        double distanceSquared = dx * dx + dy * dy;
+        double raioSquared = RAIO_COLISAO * RAIO_COLISAO;
+        return distanceSquared < raioSquared;
     }
 
     // =========================================================================
@@ -234,10 +238,11 @@ public class ShopNPC {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        // Preço
+        // Preço - destaca em vermelho se insuficiente
         Label lblPreco = new Label(preco + "G");
-        lblPreco.setFont(Font.font(FONT_PIXEL, FontWeight.NORMAL, 10));
-        lblPreco.setTextFill(Color.GOLD);
+        lblPreco.setFont(Font.font(FONT_PIXEL, FontWeight.BOLD, 10));
+        boolean temOuroSuficiente = player.getCoin() >= preco;
+        lblPreco.setTextFill(temOuroSuficiente ? Color.GOLD : Color.web("#FF6666"));
         lblPreco.setMinWidth(60);
         lblPreco.setAlignment(Pos.CENTER_RIGHT);
 
@@ -297,53 +302,17 @@ public class ShopNPC {
                 return;
             }
 
-            // Verifica inventário cheio
-            boolean adicionado = player.getInventory().addItem(item);
-            if (!adicionado) {
-                nome.setTextFill(Color.web("#FF9944")); // Flash laranja
-                desc.setText("Inventário cheio!");
-                PauseTransition ptInvCheio = new PauseTransition(Duration.millis(600));
-                ptInvCheio.setOnFinished(ev -> {
-                    nome.setTextFill(Color.web("#E8DFC0"));
-                    desc.setText(atributo);
-                });
-                ptInvCheio.play();
+            // Mostra confirmação para itens caros (>40 gold)
+            if (preco > 40) {
+                mostrarConfirmacaoCompra(item, preco, player, lblOuro, hudManager, 
+                                        nome, desc, atributo, btnComprar, estNormal, estDisable, estHover,
+                                        linha);
                 return;
             }
 
-            // Desconta as moedas e atualiza a interface
-            player.removeCoin(preco);
-            lblOuro.setText("Ouro: " + player.getCoin());
-            if (hudManager != null) hudManager.atualizar(player);
-
-            // Feedback visual no botão: "COMPRADO!"
-            btnComprar.setText("COMPRADO!");
-            btnComprar.setDisable(true); // Evita spam de duplo clique enquanto a animação roda
-            btnComprar.setStyle(
-                "-fx-background-color: rgba(0,180,80,0.25);" +
-                "-fx-border-color: #00CC66;" +
-                "-fx-border-width: 1;" +
-                "-fx-border-radius: 5;" +
-                "-fx-background-radius: 5;" +
-                "-fx-text-fill: #00CC66;" +
-                "-fx-padding: 8 12;" +
-                "-fx-font-family: '" + FONT_PIXEL + "';" +
-                "-fx-font-size: 8px;"
-            );
-
-            // Restaura o botão após 1.5s
-            PauseTransition ptComprado = new PauseTransition(Duration.millis(1500));
-            ptComprado.setOnFinished(ev -> {
-                btnComprar.setText("COMPRAR");
-                if (player.getCoin() < preco) {
-                    btnComprar.setDisable(true);
-                    btnComprar.setStyle(estDisable);
-                } else {
-                    btnComprar.setDisable(false);
-                    btnComprar.setStyle(estNormal);
-                }
-            });
-            ptComprado.play();
+            // Compra direta para itens baratos
+            executarCompra(item, preco, player, lblOuro, hudManager, 
+                          nome, desc, atributo, btnComprar, estNormal, estDisable, estHover);
         });
 
         linha.getChildren().addAll(icone, infoBox, spacer, lblPreco, btnComprar);
@@ -351,8 +320,178 @@ public class ShopNPC {
     }
 
     // =========================================================================
-    // BOTÃO FECHAR
+    // EXECUÇÃO DE COMPRA
     // =========================================================================
+
+    private static void executarCompra(Item item, int preco, Character player,
+                                       Label lblOuro, HudManager hudManager,
+                                       Label nome, Label desc, String atributoOriginal,
+                                       Button btnComprar, String estNormal, String estDisable, String estHover) {
+        // Verifica inventário cheio
+        boolean adicionado = player.getInventory().addItem(item);
+        if (!adicionado) {
+            nome.setTextFill(Color.web("#FF9944")); // Flash laranja
+            desc.setText("Inventário cheio!");
+            PauseTransition ptInvCheio = new PauseTransition(Duration.millis(600));
+            ptInvCheio.setOnFinished(ev -> {
+                nome.setTextFill(Color.web("#E8DFC0"));
+                desc.setText(atributoOriginal);
+            });
+            ptInvCheio.play();
+            return;
+        }
+
+        // Desconta as moedas e atualiza a interface
+        player.removeCoin(preco);
+        lblOuro.setText("Ouro: " + player.getCoin());
+        if (hudManager != null) hudManager.atualizar(player);
+
+        // Feedback visual no botão: "COMPRADO!"
+        btnComprar.setText("✓ COMPRADO!");
+        btnComprar.setDisable(true);
+        btnComprar.setStyle(
+            "-fx-background-color: rgba(0,180,80,0.25);" +
+            "-fx-border-color: #00CC66;" +
+            "-fx-border-width: 1;" +
+            "-fx-border-radius: 5;" +
+            "-fx-background-radius: 5;" +
+            "-fx-text-fill: #00CC66;" +
+            "-fx-padding: 8 12;" +
+            "-fx-font-family: '" + FONT_PIXEL + "';" +
+            "-fx-font-size: 8px;"
+        );
+
+        // Restaura o botão após 1.5s
+        PauseTransition ptComprado = new PauseTransition(Duration.millis(1500));
+        ptComprado.setOnFinished(ev -> {
+            btnComprar.setText("COMPRAR");
+            if (player.getCoin() < preco) {
+                btnComprar.setDisable(true);
+                btnComprar.setStyle(estDisable);
+            } else {
+                btnComprar.setDisable(false);
+                btnComprar.setStyle(estNormal);
+            }
+        });
+        ptComprado.play();
+    }
+
+    // =========================================================================
+    // CONFIRMAÇÃO DE COMPRA (itens caros)
+    // =========================================================================
+
+    private static void mostrarConfirmacaoCompra(Item item, int preco, Character player,
+                                                  Label lblOuro, HudManager hudManager,
+                                                  Label nome, Label desc, String atributoOriginal,
+                                                  Button btnComprarOrigem, 
+                                                  String estNormal, String estDisable, String estHover,
+                                                  HBox linhaOrigem) {
+        // Cria um diálogo Modal (StackPane overlay)
+        VBox dialogoBox = new VBox(16);
+        dialogoBox.setPadding(new Insets(24, 32, 24, 32));
+        dialogoBox.setStyle(
+            "-fx-background-color: rgba(15, 12, 30, 0.98);" +
+            "-fx-border-color: #FF9944;" +
+            "-fx-border-width: 3;" +
+            "-fx-border-radius: 12;" +
+            "-fx-background-radius: 12;"
+        );
+        dialogoBox.setMaxWidth(400);
+
+        // Título do diálogo
+        Text titulo = new Text("COMPRA CONFIRMADA?");
+        titulo.setFont(Font.font(FONT_PIXEL, FontWeight.BOLD, 14));
+        titulo.setFill(Color.web("#FF9944"));
+        dialogoBox.getChildren().add(titulo);
+
+        // Detalhes do item
+        VBox itemBox = new VBox(8);
+        Label nomeItem = new Label(item.getName());
+        nomeItem.setFont(Font.font(FONT_PIXEL, FontWeight.BOLD, 11));
+        nomeItem.setTextFill(Color.web("#F0E6C0"));
+
+        Label precoItem = new Label("Preço: " + preco + " ouro");
+        precoItem.setFont(Font.font(FONT_PIXEL, FontWeight.NORMAL, 10));
+        precoItem.setTextFill(Color.GOLD);
+
+        Label saldoPosCompra = new Label("Saldo após: " + (player.getCoin() - preco) + " ouro");
+        saldoPosCompra.setFont(Font.font(FONT_PIXEL, FontWeight.NORMAL, 9));
+        saldoPosCompra.setTextFill(Color.web("#888070"));
+
+        itemBox.getChildren().addAll(nomeItem, precoItem, saldoPosCompra);
+        itemBox.setStyle(
+            "-fx-background-color: rgba(35, 30, 50, 0.7);" +
+            "-fx-padding: 12;" +
+            "-fx-border-radius: 6;"
+        );
+        dialogoBox.getChildren().add(itemBox);
+
+        // Botões
+        HBox botoesBox = new HBox(12);
+        botoesBox.setAlignment(Pos.CENTER);
+
+        Button btnConfirmar = new Button("CONFIRMAR");
+        btnConfirmar.setStyle(
+            "-fx-font-family: '" + FONT_PIXEL + "';" +
+            "-fx-font-size: 10;" +
+            "-fx-background-color: rgba(0,180,80,0.3);" +
+            "-fx-text-fill: #00CC66;" +
+            "-fx-border-color: #00CC66;" +
+            "-fx-border-width: 1;" +
+            "-fx-border-radius: 5;" +
+            "-fx-padding: 10 20;"
+        );
+
+        Button btnCancelar = new Button("CANCELAR");
+        btnCancelar.setStyle(
+            "-fx-font-family: '" + FONT_PIXEL + "';" +
+            "-fx-font-size: 10;" +
+            "-fx-background-color: rgba(200,40,40,0.3);" +
+            "-fx-text-fill: #FF6666;" +
+            "-fx-border-color: #FF6666;" +
+            "-fx-border-width: 1;" +
+            "-fx-border-radius: 5;" +
+            "-fx-padding: 10 20;"
+        );
+
+        botoesBox.getChildren().addAll(btnConfirmar, btnCancelar);
+        dialogoBox.getChildren().add(botoesBox);
+
+        // Encontra o mainLayout (pai do pai de linhaOrigem)
+        StackPane foundMainLayout = null;
+        Node searchNode = linhaOrigem;
+        while (searchNode != null) {
+            if (searchNode.getParent() instanceof StackPane sp) {
+                foundMainLayout = sp;
+                break;
+            } else if (searchNode.getParent() instanceof VBox vb) {
+                searchNode = vb;
+            } else {
+                break;
+            }
+        }
+
+        if (foundMainLayout == null) return;
+        final StackPane mainLayout = foundMainLayout;
+
+        // Overlay com o diálogo
+        StackPane dialogOverlay = new StackPane(dialogoBox);
+        dialogOverlay.setStyle("-fx-background-color: rgba(0, 0, 0, 0.6);");
+        dialogOverlay.setAlignment(Pos.CENTER);
+        mainLayout.getChildren().add(dialogOverlay);
+
+        // Ações dos botões
+        btnConfirmar.setOnAction(e -> {
+            mainLayout.getChildren().remove(dialogOverlay);
+            executarCompra(item, preco, player, lblOuro, hudManager,
+                          nome, desc, atributoOriginal,
+                          btnComprarOrigem, estNormal, estDisable, estHover);
+        });
+
+        btnCancelar.setOnAction(e -> {
+            mainLayout.getChildren().remove(dialogOverlay);
+        });
+    }
 
     private static Button criarBotaoFechar() {
         Button btn = new Button("  FECHAR");

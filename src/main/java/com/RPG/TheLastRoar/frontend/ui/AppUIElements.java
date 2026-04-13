@@ -1,4 +1,4 @@
-package com.RPG.TheLastRoar.frontend.core;
+package com.RPG.TheLastRoar.frontend.ui;
 
 import com.RPG.TheLastRoar.App;
 

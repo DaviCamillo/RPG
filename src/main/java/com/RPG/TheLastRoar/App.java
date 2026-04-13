@@ -1,6 +1,11 @@
 package com.RPG.TheLastRoar;
 
 
+import com.RPG.TheLastRoar.backend.core.AppGameLoop;
+import com.RPG.TheLastRoar.backend.core.AppGameState;
+import com.RPG.TheLastRoar.backend.core.AppInitializer;
+import com.RPG.TheLastRoar.backend.core.AppKeyboardControls;
+import com.RPG.TheLastRoar.backend.core.GameConstants;
 import com.RPG.TheLastRoar.backend.managers.EnemyManager;
 import com.RPG.TheLastRoar.backend.managers.SaveManager;
 import com.RPG.TheLastRoar.backend.models.Character;
@@ -12,11 +17,7 @@ import com.RPG.TheLastRoar.frontend.screens.IntroScreen;
 import com.RPG.TheLastRoar.frontend.screens.InventoryScreen;
 import com.RPG.TheLastRoar.frontend.screens.PauseMenu;
 import com.RPG.TheLastRoar.frontend.screens.StartScreen;
-import com.RPG.TheLastRoar.frontend.core.AppGameLoop;
-import com.RPG.TheLastRoar.frontend.core.AppKeyboardControls;
-import com.RPG.TheLastRoar.frontend.core.AppGameState;
-import com.RPG.TheLastRoar.frontend.core.AppUIElements;
-import com.RPG.TheLastRoar.frontend.core.AppInitializer;
+import com.RPG.TheLastRoar.frontend.ui.AppUIElements;
 
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
@@ -135,7 +136,9 @@ public class App extends javafx.application.Application {
     // =========================================================================
 
     public final String[] MAP_LIST = {
-        "mapa_padrao.png", "mapa_padrao2.png", "mapa_padrao3.png"
+        GameConstants.MAP_INTRO,
+        GameConstants.MAP_INTERMEDIATE,
+        GameConstants.MAP_BOSS
     };
     public int       currentMapIndex = 0;
     public boolean[][] defeatedEnemies;  // [mapa][idInimigo]
@@ -188,12 +191,7 @@ public class App extends javafx.application.Application {
         initializer = new AppInitializer(this);
 
         // Carrega o ícone da janela
-        try {
-            Image icon = new Image(getClass().getResourceAsStream("/images/logo.png"));
-            stage.getIcons().add(icon);
-        } catch (Exception e) {
-            System.out.println("[App] Ícone não encontrado: " + e.getMessage());
-        }
+        loadWindowIcon(stage);
 
         // Monta o menu inicial
         StackPane menuLayout = StartScreen.createLayout(
@@ -202,15 +200,8 @@ public class App extends javafx.application.Application {
             (slotName) -> initializer.startGame(stage, slotName)
         );
 
-        masterScene = new Scene(menuLayout, 800, 600);
-        stage.setTitle("The Last Roar");
-        stage.setScene(masterScene);
-        stage.setFullScreenExitHint("");
-        stage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH);
-        stage.setFullScreen(true);
-        stage.show();
-
-        Platform.runLater(menuLayout::requestFocus);
+        // Configura e exibe a janela
+        setupAndShowWindow(stage, menuLayout);
     }
 
     // =========================================================================
@@ -219,29 +210,51 @@ public class App extends javafx.application.Application {
 
     /**
      * Alterna entre pausado e em jogo.
+     * Refatorado: extração de comportamentos em métodos privados.
      */
     public void togglePause() {
         if (lojaAberta || inventarioAberto || isTransitioning) return;
         isPaused = !isPaused;
 
         if (isPaused) {
-            playerMovement.stop();
-            enemyAI.stop();
-            resetMovement();
-            btnInventory.setVisible(false);
-            pauseMenu.atualizarBotoesLoad(
-                SaveManager.existe("save1.json"),
-                SaveManager.existe("save2.json"),
-                SaveManager.existe("save3.json")
-            );
-            pauseMenu.setVisible(true);
+            pauseGameState();
         } else {
-            pauseMenu.setVisible(false);
-            btnInventory.setVisible(true);
-            playerMovement.start();
-            if (!enemyManager.isEmpty()) enemyAI.start();
-            Platform.runLater(() -> mainLayout.requestFocus());
+            resumeGameState();
         }
+    }
+
+    /**
+     * Pausa o jogo: para timers, mostra menu e esconde ações.
+     */
+    private void pauseGameState() {
+        playerMovement.stop();
+        enemyAI.stop();
+        resetMovement();
+        btnInventory.setVisible(false);
+        updatePauseMenuSaveButtons();
+        pauseMenu.setVisible(true);
+    }
+
+    /**
+     * Retoma o jogo: reinicia timers e restaura interface.
+     */
+    private void resumeGameState() {
+        pauseMenu.setVisible(false);
+        btnInventory.setVisible(true);
+        playerMovement.start();
+        if (!enemyManager.isEmpty()) enemyAI.start();
+        Platform.runLater(() -> mainLayout.requestFocus());
+    }
+
+    /**
+     * Atualiza disponibilidade dos botões de carregamento no menu.
+     */
+    private void updatePauseMenuSaveButtons() {
+        pauseMenu.atualizarBotoesLoad(
+            SaveManager.existe(GameConstants.SAVE_SLOT_1),
+            SaveManager.existe(GameConstants.SAVE_SLOT_2),
+            SaveManager.existe(GameConstants.SAVE_SLOT_3)
+        );
     }
 
     /**
@@ -277,20 +290,38 @@ public class App extends javafx.application.Application {
 
     /**
      * Usa a primeira poção disponível no inventário (atalho tecla H).
+     * Refatorado: extração de lógica em métodos privados.
      */
     public void usePotionOnMap() {
         if (player.getLife() >= player.getMaxLife()) return;
 
-        Potion foundPotion = null;
-        for (Item item : player.getInventory().getItems()) {
-            if (item instanceof Potion p) { foundPotion = p; break; }
-        }
+        Potion foundPotion = findFirstPotionInInventory();
         if (foundPotion == null) return;
 
-        int actualHeal = Math.min(foundPotion.getHealedLife(),
-                                  player.getMaxLife() - player.getLife());
-        player.heal(foundPotion.getHealedLife());
-        player.getInventory().removeItem(foundPotion);
+        healPlayerWithPotion(foundPotion);
+    }
+
+    /**
+     * Procura pela primeira poção disponível no inventário.
+     */
+    private Potion findFirstPotionInInventory() {
+        for (Item item : player.getInventory().getItems()) {
+            if (item instanceof Potion p) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Aplica cura da poção ao jogador e atualiza interface.
+     */
+    private void healPlayerWithPotion(Potion potion) {
+        int maxhealAmount = player.getMaxLife() - player.getLife();
+        int actualHeal = Math.min(potion.getHealedLife(), maxhealAmount);
+
+        player.heal(potion.getHealedLife());
+        player.getInventory().removeItem(potion);
         hudManager.atualizar(player);
 
         uiElements.showToast("+" + actualHeal + " HP", javafx.scene.paint.Color.web("#00CC66"));
@@ -302,23 +333,35 @@ public class App extends javafx.application.Application {
 
     /**
      * Abre a tela de inventário como overlay.
+     * Refatorado: extração de lógica em métodos privados.
      */
     public void openInventory() {
         if (inventarioAberto || isPaused || lojaAberta || isTransitioning) return;
 
+        pauseForInventory();
+        InventoryScreen.open(mainLayout, player, this::resumeFromInventory);
+    }
+
+    /**
+     * Para timers e reseta movimento para abertura do inventário.
+     */
+    private void pauseForInventory() {
         inventarioAberto = true;
         btnInventory.setVisible(false);
         playerMovement.stop();
         enemyAI.stop();
         resetMovement();
+    }
 
-        InventoryScreen.open(mainLayout, player, () -> {
-            inventarioAberto = false;
-            btnInventory.setVisible(true);
-            playerMovement.start();
-            if (!enemyManager.isEmpty()) enemyAI.start();
-            Platform.runLater(() -> mainLayout.requestFocus());
-        });
+    /**
+     * Retoma o jogo após fechar inventário.
+     */
+    private void resumeFromInventory() {
+        inventarioAberto = false;
+        btnInventory.setVisible(true);
+        playerMovement.start();
+        if (!enemyManager.isEmpty()) enemyAI.start();
+        Platform.runLater(() -> mainLayout.requestFocus());
     }
 
     // =========================================================================
@@ -351,6 +394,42 @@ public class App extends javafx.application.Application {
      */
     public void resumeTimers() {
         initializer.resumeTimers();
+    }
+
+    // =========================================================================
+    // PRIVATE UTILITY METHODS — Métodos auxiliares de inicialização
+    // =========================================================================
+
+    /**
+     * Carrega o ícone da janela do arquivo de recursos.
+     */
+    private void loadWindowIcon(Stage stage) {
+        try {
+            Image icon = new Image(
+                getClass().getResourceAsStream(GameConstants.IMAGE_LOGO_PATH)
+            );
+            stage.getIcons().add(icon);
+        } catch (Exception e) {
+            System.out.println("[App] Ícone não encontrado: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Configura e exibe a janela principal do jogo.
+     */
+    private void setupAndShowWindow(Stage stage, StackPane menuLayout) {
+        masterScene = new Scene(
+            menuLayout,
+            GameConstants.WINDOW_WIDTH,
+            GameConstants.WINDOW_HEIGHT
+        );
+        stage.setTitle("The Last Roar");
+        stage.setScene(masterScene);
+        stage.setFullScreenExitHint("");
+        stage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH);
+        stage.setFullScreen(true);
+        stage.show();
+        Platform.runLater(menuLayout::requestFocus);
     }
 
     // =========================================================================
